@@ -184,7 +184,7 @@ const server = http.createServer(async (req, res) => {
     const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: MODEL, messages: [{ role: 'system', content: POLICY }, ...messages], temperature: 0.2, max_tokens: 850 }),
+      body: JSON.stringify({ model: MODEL, messages: [{ role: 'system', content: POLICY }, ...messages], temperature: 0.2, max_tokens: 1800 }),
       signal: AbortSignal.timeout(30_000)
     });
     if (!upstream.ok) {
@@ -192,10 +192,27 @@ const server = http.createServer(async (req, res) => {
       const status = upstream.status === 429 ? 503 : 502;
       return send(res, status, { error: 'AI service temporarily unavailable. Please retry.' }, extra);
     }
-    const result = await upstream.json();
-    const reply = result?.choices?.[0]?.message?.content;
-    if (typeof reply !== 'string' || !reply.trim()) return send(res, 502, { error: 'AI returned an empty response.' }, extra);
-    return send(res, 200, { reply: reply.trim() }, extra);
+    
+const result = await upstream.json();
+const choice = result?.choices?.[0];
+const reply = choice?.message?.content;
+const finishReason = choice?.finish_reason;
+
+if (typeof reply !== 'string' || !reply.trim()) {
+  return send(res, 502, {
+    error: 'AI returned an empty response.'
+  }, extra);
+}
+
+if (finishReason === 'length') {
+  console.warn('AI response truncated: output token limit reached.');
+  return send(res, 502, {
+    error: 'The AI response was too long to complete. Please request a shorter summary and retry.'
+  }, extra);
+}
+
+return send(res, 200, { reply: reply.trim() }, extra);
+
   } catch (err) {
     const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
     console.error('AI request failed:', timedOut ? 'timeout' : 'network_or_parse_error');
