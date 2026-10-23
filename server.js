@@ -18,7 +18,6 @@ const MAX_TRACKED_KEYS = 5000;
 const MAX_CONCURRENT = 8;
 const hits = new Map();
 let active = 0;
-const { searchPubMed, detectCompounds } = require('./pubmed');
 
 const POLICY = `You are VanguardBio-You AI Peptide Advisor, an educational peptide research and safety assistant.
 
