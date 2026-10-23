@@ -20,6 +20,41 @@ const hits = new Map();
 let active = 0;
 
 
+function formatChatReply(reply) {
+  if (typeof reply !== 'string') return reply;
+
+  return reply
+    // Repair the malformed PubMed link pattern seen in chat.
+    // Only repairs links whose displayed PMID matches the URL.
+    .replace(
+      /\[(\d{6,9})\]\\?\(\[https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/\1\/\]\((https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/\1\/)\)\\?\)/gi,
+      '[PMID: $1]($2)'
+    )
+
+    // Replace duplicated numbered study headings with bullets.
+    // Example: 1. **1.Study title** -> - **Study title**
+    .replace(
+      /^\s*\d+\.\s+\*\*(?:\d+\.)?\s*/gm,
+      '- **'
+    )
+
+    // Remove escaped list markers at the start of a line.
+    // Example: \- Biomarkers -> - Biomarkers
+    .replace(
+      /^(\s*)\\- /gm,
+      '$1- '
+    )
+
+    // Remove escaped parentheses around otherwise valid
+    // Markdown PubMed links.
+    .replace(
+      /\\\((\[[^\]\n]+\]\(https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/\d+\/\))\\\)/gi,
+      '$1'
+    )
+
+    .trim();
+}
+
 function validatePubMedCitations(reply, studies, requireCitation = false) {
   const allowed = new Set(studies.map(study => String(study.pmid)));
   const cited = new Set();
@@ -367,7 +402,9 @@ if (!citationCheck.valid) {
   }, extra);
 }
 
-return send(res, 200, { reply: reply.trim() }, extra);
+return send(res, 200, {
+  reply: formatChatReply(reply.trim())
+}, extra);
 
   } catch (err) {
     const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
