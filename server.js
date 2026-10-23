@@ -20,39 +20,43 @@ const hits = new Map();
 let active = 0;
 
 
+
 function formatChatReply(reply) {
   if (typeof reply !== 'string') return reply;
 
   return reply
-    // Repair the malformed PubMed link pattern seen in chat.
-    // Only repairs links whose displayed PMID matches the URL.
+    // Normalize nonbreaking spaces.
+    .replace(/\u00A0/g, ' ')
+
+    // Repair nested, escaped PubMed links when the
+    // displayed PMID and URL PMID match.
     .replace(
-      /\[(\d{6,9})\]\\?\(\[https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/\1\/\]\((https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/\1\/)\)\\?\)/gi,
+      /\[(\d{6,9})\]\\?\(\[https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/\1\/?\]\((https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/\1\/?)\)\\?\)/gi,
       '[PMID: $1]($2)'
     )
 
-    // Replace duplicated numbered study headings with bullets.
-    // Example: 1. **1.Study title** -> - **Study title**
+    // Repair escaped parentheses around valid
+    // Markdown PubMed links.
+    .replace(
+      /\\\((\[[^\]\n]+\]\(https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/\d+\/?\))\\\)/gi,
+      '$1'
+    )
+
+    // Remove duplicated numbering in study titles.
     .replace(
       /^\s*\d+\.\s+\*\*(?:\d+\.)?\s*/gm,
       '- **'
     )
 
-    // Remove escaped list markers at the start of a line.
-    // Example: \- Biomarkers -> - Biomarkers
+    // Remove escaped list markers.
     .replace(
-      /^(\s*)\\- /gm,
+      /^(\s*)\\-\s+/gm,
       '$1- '
     )
 
-    // Remove escaped parentheses around otherwise valid
-    // Markdown PubMed links.
-    .replace(
-      /\\\((\[[^\]\n]+\]\(https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/\d+\/\))\\\)/gi,
-      '$1'
-    )
-
     .trim();
+}
+
 }
 
 function validatePubMedCitations(reply, studies, requireCitation = false) {
