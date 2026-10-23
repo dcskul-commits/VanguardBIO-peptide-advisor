@@ -111,4 +111,4 @@ async function searchPubMed(question, maxResults = 5) {
   return parseMedline(await fetchResponse.text());
 }
 
-module.exports = { searchPubMed, detectCompounds };
+export { searchPubMed, detectCompounds };
