@@ -19,6 +19,49 @@ const MAX_CONCURRENT = 8;
 const hits = new Map();
 let active = 0;
 
+
+function validatePubMedCitations(reply, studies, requireCitation = false) {
+  const allowed = new Set(studies.map(study => String(study.pmid)));
+  const cited = new Set();
+  const invalid = new Set();
+
+  // Recognize PubMed links in Markdown or plain text.
+  const urlPattern =
+    /https?:\/\/(?:www\.)?pubmed\.ncbi\.nlm\.nih\.gov\/(\d+)\/?/gi;
+
+  for (const match of reply.matchAll(urlPattern)) {
+    const pmid = match[1];
+    cited.add(pmid);
+    if (!allowed.has(pmid)) invalid.add(pmid);
+  }
+
+  // Recognize explicit PMID labels, including Markdown labels.
+  const labelPattern = /\bPMID\s*:?\s*\[?(\d{6,9})\]?/gi;
+
+  for (const match of reply.matchAll(labelPattern)) {
+    const pmid = match[1];
+    cited.add(pmid);
+    if (!allowed.has(pmid)) invalid.add(pmid);
+  }
+
+  // Detect citations where the displayed PMID and URL disagree.
+  const linkedPattern =
+    /PMID\s*:?\s*\[?(\d{6,9})\]?[^\n]{0,120}?https?:\/\/(?:www\.)?pubmed\.ncbi\.nlm\.nih\.gov\/(\d+)/gi;
+
+  for (const match of reply.matchAll(linkedPattern)) {
+    if (match[1] !== match[2]) {
+      invalid.add(match[1]);
+      invalid.add(match[2]);
+    }
+  }
+
+  return {
+    valid: invalid.size === 0 && (!requireCitation || cited.size > 0),
+    citedCount: cited.size,
+    invalidPmids: [...invalid]
+  };
+}
+
 const POLICY = `You are VanguardBio-You AI Peptide Advisor, an educational peptide research and safety assistant.
 
 CORE RESPONSIBILITIES
@@ -220,12 +263,14 @@ try {
     researchIntent && detectCompounds(latestQuestion).length > 0;
 
   let researchContext = '';
-  let pubmedStatus = 'not_requested';
+let pubmedStatus = 'not_requested';
+let retrievedStudies = [];
 
   if (shouldSearchPubMed) {
     try {
       const studies = await searchPubMed(latestQuestion, 5);
-
+retrievedStudies = studies;
+       
       pubmedStatus = studies.length ? 'retrieved' : 'no_results';
 
       if (studies.length) {
@@ -300,6 +345,25 @@ if (finishReason === 'length') {
   console.warn('AI response truncated: output token limit reached.');
   return send(res, 502, {
     error: 'The AI response was too long to complete. Please request a shorter summary and retry.'
+  }, extra);
+}
+
+
+const citationCheck = validatePubMedCitations(
+  reply,
+  retrievedStudies,
+  pubmedStatus === 'retrieved'
+);
+
+if (!citationCheck.valid) {
+  console.warn('PubMed citation validation failed:', {
+    sourceStatus: pubmedStatus,
+    citedCount: citationCheck.citedCount,
+    invalidPmids: citationCheck.invalidPmids
+  });
+
+  return send(res, 502, {
+    error: 'The research response could not be verified against retrieved PubMed references. Please retry.'
   }, extra);
 }
 
