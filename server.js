@@ -103,6 +103,24 @@ function validatePubMedCitations(reply, studies, requireCitation = false) {
   };
 }
 
+
+// PubMed is a literature index, not the regulator. Remove PubMed links only
+// from lines devoted to FDA/WADA classifications. Do not remove clinical
+// citations from mixed evidence paragraphs or the general references section.
+function removeRegulatoryOnlyPubMedCitations(reply) {
+  if (typeof reply !== 'string') return reply;
+  let removed = 0;
+  const lines = reply.split('\n').map(line => {
+    const regulatory = /\b(?:WADA|anti-doping|prohibited (?:under|by)|FDA (?:approval|status)|not FDA-approved)\b/i.test(line);
+    const clinical = /\b(?:clinical|trial|study|studies|research|patient|human evidence|adverse|safety|efficacy|randomized|results|review|data)\b/i.test(line);
+    if (!regulatory || clinical) return line;
+    return line.replace(/\s*(?:\[PMID:\s*\d{6,9}\]\(https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/\d+\/?\)|PMID:\s*\d{6,9}\s*\(https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/\d+\/?\))/gi,
+      () => { removed++; return ''; });
+  });
+  if (removed) console.warn('REGULATORY_CITATION_GUARD: removed', removed, 'PubMed citations from regulatory-only lines');
+  return lines.join('\n');
+}
+
 // Targeted safeguard for a known false BPC-157/WADA claim. This does not
 // replace verification against the current official WADA Prohibited List.
 const BPC_WADA_CORRECTION =
@@ -447,6 +465,10 @@ retrievedStudies = studies;
           `Publication date: ${study.date || 'Not provided'}`,
           `PMID: ${study.pmid}`,
           `URL: ${study.url}`,
+          `Publication types (PubMed): ${(study.publicationTypes || []).join('; ') || 'Not indexed'}`,
+          `Evidence classification: ${study.evidenceType || 'Unverified'}`,
+          `Compounds explicitly named in title/abstract: ${(study.matchedCompounds || []).join(', ') || 'None detected'}`,
+          `Interpretation warning: ${study.interpretationWarning || 'Check population, intervention and outcomes before citing'}`,
           `Abstract: ${study.abstract || 'Abstract unavailable'}`
         ].join('\n')).join('\n\n');
       }
@@ -468,6 +490,12 @@ SOURCE RULES:
 - Use the exact PMID and URL supplied in the PubMed research data.
 - Never invent a citation or cite a record that does not support the statement.
 - If the retrieved records are not relevant to the question, explain that limitation rather than presenting them as supporting evidence.
+- PUBLICATION TYPE IS NOT AN OUTCOME: a review or systematic review summarizes literature and is not itself a human intervention trial. State the design of the underlying study when known; otherwise say not verified.
+- Before each citation, check that the abstract explicitly supports the claim's EXACT compound, population, measured endpoint, and direction of effect. If any of these are unclear, narrow the claim or omit the citation. Do not infer recovery from GH, IGF-1, fat-free mass, or bone markers.
+- TB-500 fragments and full-length thymosin beta-4 are not interchangeable. Cite full-length thymosin beta-4 research only as research on full-length thymosin beta-4.
+- PubMed records are NOT authoritative for FDA approval or WADA classification. Do not attach a PMID to a regulatory-only sentence, bullet, table cell, or regulatory reference list. Refer readers to the official WADA Prohibited List (https://www.wada-ama.org/en/prohibited-list) and FDA Drugs@FDA (https://www.accessdata.fda.gov/scripts/cder/daf/) for independent current checks; these official sites were NOT fetched live by this request.
+- Do not present a regulatory statement as live-verified. Use the known WADA classification context already in the core policy, with a qualification to consult the latest official list.
+- Do not cite a general sports-medicine review as a primary trial or use it as the sole source for a specific adverse-event rate.
 
 - Never invent references, study results, clinical outcomes, or publication details.
 - Explain whether evidence is human clinical, animal, laboratory, or mechanistic.
@@ -637,7 +665,7 @@ if (!citationCheck.valid) {
 }
 
 return send(res, 200, {
-  reply: safeguardMk677WadaStatus(safeguardBpcWadaStatus(formatChatReply(finalReply.trim())))
+  reply: removeRegulatoryOnlyPubMedCitations(safeguardMk677WadaStatus(safeguardBpcWadaStatus(formatChatReply(finalReply.trim()))))
 }, extra);
 
   } catch (err) {

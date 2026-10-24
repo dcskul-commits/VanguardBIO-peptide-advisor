@@ -1,5 +1,7 @@
 'use strict';
 
+// NCBI E-utilities retrieval. Study metadata is bibliographic evidence, not a
+// guarantee that a particular clinical claim is supported by the paper.
 const BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
 const PEPTIDES = [
   { name: 'BPC-157', pattern: /\bBPC[\s-]?157\b/i, terms: ['BPC-157', 'BPC 157'] },
@@ -27,15 +29,12 @@ function parseMedline(text) {
   function finish() {
     if (record.PMID && record.TI) {
       const pmid = record.PMID.trim();
-      if (/^\d{6,9}$/.test(pmid)) {
-        records.push({
-          pmid, title: record.TI.trim(),
-          date: (record.DP || '').trim(),
-          abstract: (record.AB || '').trim().slice(0, 3500),
-          publicationTypes: record.PT || [],
-          url: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`
-        });
-      }
+      if (/^\d{6,9}$/.test(pmid)) records.push({
+        pmid, title: record.TI.trim(), date: (record.DP || '').trim(),
+        abstract: (record.AB || '').trim().slice(0, 3500),
+        publicationTypes: record.PT || [],
+        url: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`
+      });
     }
     record = {};
     lastField = null;
@@ -47,22 +46,17 @@ function parseMedline(text) {
       if (field === 'PMID' && record.PMID) finish();
       lastField = field;
       if (field === 'PT') (record.PT ||= []).push(value.trim());
-      else if (['PMID', 'TI', 'DP', 'AB'].includes(field))
-        record[field] = (record[field] || '') + value;
+      else if (['PMID', 'TI', 'DP', 'AB'].includes(field)) record[field] = (record[field] || '') + value;
     } else if (/^\s{6}/.test(line) && lastField) {
-      if (lastField === 'PT' && record.PT?.length)
-        record.PT[record.PT.length - 1] += ' ' + line.trim();
-      else if (typeof record[lastField] === 'string')
-        record[lastField] += ' ' + line.trim();
+      if (lastField === 'PT' && record.PT?.length) record.PT[record.PT.length - 1] += ' ' + line.trim();
+      else if (typeof record[lastField] === 'string') record[lastField] += ' ' + line.trim();
     }
   }
   finish();
   return records;
 }
 
-// NCBI recommends no more than three requests per second without an API key.
-// Serialize requests in this process; a shared deployment-wide limiter is still
-// required if multiple application instances call NCBI concurrently.
+// Per-process pacing; multiple Render instances need an external shared limiter.
 async function paceNCBI() {
   const previous = ncbiQueue;
   let release;
@@ -82,7 +76,6 @@ async function fetchNCBI(endpoint, params) {
     ...(process.env.NCBI_EMAIL ? { email: process.env.NCBI_EMAIL } : {}),
     ...(process.env.NCBI_API_KEY ? { api_key: process.env.NCBI_API_KEY } : {})
   }).toString();
-
   for (let attempt = 0; attempt < 3; attempt++) {
     await paceNCBI();
     try {
@@ -121,6 +114,7 @@ function classifyStudy(study) {
   if (types.includes('meta-analysis')) return 'meta-analysis (publication type)';
   if (types.includes('systematic review')) return 'systematic review (publication type)';
   if (types.includes('review')) return 'review (publication type)';
+  if (types.includes('case reports')) return 'case report (publication type)';
   return 'study design not verified from publication type';
 }
 
@@ -156,11 +150,8 @@ async function fetchStudies(ids) {
 function enrich(study) {
   const matchedCompounds = detectCompounds(`${study.title} ${study.abstract}`);
   return {
-    ...study,
-    matchedCompounds,
-    evidenceType: classifyStudy(study),
-    // A publication type does not verify a study's endpoints or completed results.
-    interpretationWarning: 'Verify intervention identity, population, endpoints and results from the original publication.'
+    ...study, matchedCompounds, evidenceType: classifyStudy(study),
+    interpretationWarning: 'Verify exact intervention, study population, endpoints and findings before citing. A review is not a primary trial.'
   };
 }
 
@@ -171,33 +162,23 @@ export async function searchPubMed(question, maxResults = 5) {
   const key = `${question.toLowerCase().trim()}|${count}`;
   const cached = cache.get(key);
   if (cached && Date.now() - cached.time < CACHE_TTL) return cached.results;
-
-  const wantsHumanEvidence =
-    /\b(human|humans|clinical|trial|trials|strength|function|efficacy|effectiveness|patients)\b/i.test(question);
+  const wantsHumanEvidence = /\b(human|humans|clinical|trial|trials|strength|function|efficacy|effectiveness|patients)\b/i.test(question);
   const perCompound = new Map();
   const allIds = new Set();
-
-  // Search each compound independently, rather than letting one compound
-  // consume all candidate slots in a combined OR query.
   for (const compound of compounds) {
     const entry = PEPTIDES.find(item => item.name === compound);
     const base = `(${entry.terms.map(term => `"${term}"[All Fields]`).join(' OR ')})`;
     const ids = [];
-    if (wantsHumanEvidence) {
-      ids.push(...await searchIds(`${base} AND (randomized controlled trial[pt] OR clinical trial[pt])`, 8));
-    }
+    if (wantsHumanEvidence) ids.push(...await searchIds(`${base} AND (randomized controlled trial[pt] OR clinical trial[pt])`, 8));
     ids.push(...await searchIds(base, 12));
     const unique = [...new Set(ids)].slice(0, 14);
     perCompound.set(compound, unique);
     unique.forEach(id => allIds.add(id));
   }
-
   if (!allIds.size) return [];
   const studies = (await fetchStudies([...allIds].slice(0, 60))).map(enrich);
   const byId = new Map(studies.map(study => [study.pmid, study]));
   const chosen = new Map();
-
-  // Round-robin selection ensures coverage when sufficient relevant records exist.
   const rankedByCompound = new Map(compounds.map(compound => [
     compound,
     (perCompound.get(compound) || [])
@@ -211,14 +192,9 @@ export async function searchPubMed(question, maxResults = 5) {
     for (const compound of compounds) {
       if (chosen.size >= count) break;
       const candidate = rankedByCompound.get(compound).find(study => !chosen.has(study.pmid));
-      if (candidate) {
-        chosen.set(candidate.pmid, candidate);
-        progress = true;
-      }
+      if (candidate) { chosen.set(candidate.pmid, candidate); progress = true; }
     }
   }
-
-  // If strict matching is sparse, do not fill the report with unrelated studies.
   const results = [...chosen.values()];
   if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value);
   cache.set(key, { time: Date.now(), results });
