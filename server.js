@@ -197,6 +197,7 @@ Allow users to skip questions or stop the intake.
 If the user asks an unrelated research question, answer it and offer to resume the intake.
 
 AFTER THE SIX QUESTIONS
+Immediately produce the complete educational research and safety summary in the SAME response to the sixth answer. Do not stop at an acknowledgement, say you will prepare it, or require a follow-up such as "ok".
 Prepare an educational research and safety summary containing:
 - The user's stated research goals
 - Relevant peptide categories or approaches
@@ -379,8 +380,11 @@ const conversationCompounds = detectCompounds(conversationText);
 // contain the words "generate report". The frontend sends the prior assistant
 // question in conversation history.
 const priorAssistant = [...messages].reverse().find(m => m.role === 'assistant');
+// The live intake uses "Final question:" rather than "Question 6:".
+// Recognize both wordings, but only after the user has answered it.
 const justAnsweredQuestionSix = Boolean(priorAssistant &&
-  /\b(?:question|q)\s*6\s*(?:[:.\-]|of\s*6\b)/i.test(priorAssistant.content));
+  /(?:\b(?:question|q)\s*6\s*(?:[:.\-]|of\s*6\b)|\bfinal\s+(?:intake\s+)?question\s*:)/i.test(priorAssistant.content) &&
+  /\?/.test(priorAssistant.content));
 
 const isFinalResearchRequest =
   /\b(final|complete|completed|generate|prepare|compile)\b/i.test(latestQuestion) &&
