@@ -295,6 +295,13 @@ active++;
 try {
   const latestQuestion = messages.at(-1).content;
 
+const requestedPmids = [
+  ...new Set(
+    [...latestQuestion.matchAll(/\b(?:PMID\s*:?\s*|pubmed\.ncbi\.nlm\.nih\.gov\/)(\d{6,9})\b/gi)]
+      .map(match => match[1])
+  )
+].slice(0, 3);
+
   const researchIntent =
     /\b(research|study|studies|clinical|trial|trials|evidence|safety|efficacy|effectiveness|compare|comparison|FDA|approved|approval|scientific|publication|pubmed|muscle repair|tendon repair)\b/i
       .test(latestQuestion);
@@ -308,9 +315,30 @@ let retrievedStudies = [];
 
   if (shouldSearchPubMed) {
     try {
-      const studies = await searchPubMed(latestQuestion, 5);
+      
+const studies = await searchPubMed(latestQuestion, 5);
+
+for (const pmid of requestedPmids) {
+  if (studies.some(study => study.pmid === pmid)) {
+    continue;
+  }
+
+  try {
+    const verifiedStudy = await fetchPubMedByPMID(pmid);
+
+    if (verifiedStudy) {
+      studies.push(verifiedStudy);
+    }
+  } catch (err) {
+    console.warn('Direct PMID verification failed:', {
+      pmid,
+      reason: err?.message || 'Unknown error'
+    });
+  }
+}
+
 retrievedStudies = studies;
-       
+      
       pubmedStatus = studies.length ? 'retrieved' : 'no_results';
 
       if (studies.length) {
