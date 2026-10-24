@@ -257,4 +257,24 @@ async function searchPubMed(question, maxResults = 5) {
   return results;
 }
 
-export { searchPubMed, detectCompounds };
+
+async function fetchPubMedByPMID(pmid) {
+  const id = String(pmid).trim();
+
+  if (!/^\d{6,9}$/.test(id)) {
+    return null;
+  }
+
+  const response = await fetchNCBI('efetch.fcgi', {
+    db: 'pubmed',
+    id,
+    rettype: 'medline',
+    retmode: 'text'
+  });
+
+  const studies = parseMedline(await response.text());
+
+  return studies.find(study => study.pmid === id) || null;
+}
+
+export { searchPubMed, detectCompounds, fetchPubMedByPMID };
