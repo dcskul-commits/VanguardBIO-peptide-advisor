@@ -380,11 +380,20 @@ const conversationCompounds = detectCompounds(conversationText);
 // contain the words "generate report". The frontend sends the prior assistant
 // question in conversation history.
 const priorAssistant = [...messages].reverse().find(m => m.role === 'assistant');
-// The live intake uses "Final question:" rather than "Question 6:".
-// Recognize both wordings, but only after the user has answered it.
+// The model can phrase Q6 as "Question 6:", "Final question:",
+// "One last question:", or simply ask about remaining concerns.
+// Require a question and, for the unnumbered variants, a full six-answer
+// intake history to avoid treating an early "last question" as completion.
+const userAnswerCount = messages.filter(m => m.role === 'user').length;
+const lastAssistantText = priorAssistant?.content || '';
+const numberedSixthQuestion = /\b(?:question|q)\s*6\s*(?:[:.\-]|of\s*6\b)/i.test(lastAssistantText);
+const explicitFinalQuestion = /\b(?:final|one\s+last|last)\s+(?:intake\s+)?question\b/i.test(lastAssistantText);
+const remainingConcernsQuestion = /\b(?:remaining|other|additional)\s+(?:questions?|concerns?|topics?)\b/i.test(lastAssistantText) &&
+  /\b(?:summary|report|research|address|cover|include)\b/i.test(lastAssistantText);
 const justAnsweredQuestionSix = Boolean(priorAssistant &&
-  /(?:\b(?:question|q)\s*6\s*(?:[:.\-]|of\s*6\b)|\bfinal\s+(?:intake\s+)?question\s*:)/i.test(priorAssistant.content) &&
-  /\?/.test(priorAssistant.content));
+  /\?/.test(lastAssistantText) &&
+  (numberedSixthQuestion || (userAnswerCount >= 6 &&
+    (explicitFinalQuestion || remainingConcernsQuestion))));
 
 const isFinalResearchRequest =
   /\b(final|complete|completed|generate|prepare|compile)\b/i.test(latestQuestion) &&
@@ -550,7 +559,7 @@ if (finishReason === 'length') {
 let finalReply = reply;
 if (justAnsweredQuestionSix && (
   /\b(?:I will|I'll|let me|going to)\s+(?:now\s+)?(?:prepare|generate|compile|create|put together)\b/i.test(finalReply) ||
-  /\b(?:I have all (?:the )?information|I will prepare the report now|report (?:will be|is being) prepared)\b/i.test(finalReply) ||
+  /\b(?:I have all (?:the )?information|I will prepare the report now|report (?:will be|is being) prepared|please hold on|hold on for the (?:full )?report)\b/i.test(finalReply) ||
   finalReply.trim().length < 650
 )) {
   console.warn('INCOMPLETE_INTAKE_REPORT: retrying once');
@@ -580,7 +589,8 @@ if (justAnsweredQuestionSix && (
   finalReply = retryResult?.choices?.[0]?.message?.content || '';
 }
 if (justAnsweredQuestionSix && (finalReply.trim().length < 650 ||
-  /\b(?:I will|I'll|let me|going to)\s+(?:now\s+)?(?:prepare|generate|compile|create|put together)\b/i.test(finalReply))) {
+  /\b(?:I will|I'll|let me|going to)\s+(?:now\s+)?(?:prepare|generate|compile|create|put together)\b/i.test(finalReply) ||
+  /\bplease hold on\b/i.test(finalReply))) {
   console.warn('INCOMPLETE_INTAKE_REPORT: refusing transition as completed report');
   return send(res, 502, { error: 'The research report was not completed. Please retry.' }, extra);
 }
