@@ -422,15 +422,25 @@ if (finishReason === 'length') {
   }, extra);
 }
 
+const lastAssistantMessage = [...messages]
+  .reverse()
+  .find(message => message.role === 'assistant');
+
+const lastAssistantQuestion =
+  lastAssistantMessage?.content || '';
+
 const isIntakeQuestion =
-  /(?:^|\n)\s*(?:question\s*[1-6]\s*[:.)-]?\s*)?/i.test(reply) &&
-  /\?\s*$/.test(reply.trim()) &&
-  /(?:what is your|what are your|are you primarily|is there a particular|how would you prefer|what remaining|would you like to)/i.test(reply);
+  /\bQuestion\s*[1-6]\s*:/i.test(reply) &&
+  /\?\s*$/.test(reply.trim());
+
+const intakeInProgress =
+  /\bQuestion\s*[1-5]\s*:/i.test(lastAssistantQuestion) ||
+  isIntakeQuestion;
 
 const citationCheck = validatePubMedCitations(
   reply,
   retrievedStudies,
-  pubmedStatus === 'retrieved' && !isIntakeQuestion
+  pubmedStatus === 'retrieved' && !intakeInProgress
 );
 
 if (!citationCheck.valid) {
