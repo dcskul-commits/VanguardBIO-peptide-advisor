@@ -133,6 +133,26 @@ function safeguardBpcWadaStatus(reply) {
     'I have not performed a live check of the current WADA list in this response.';
 }
 
+// Correct known MK-677 WADA misclassifications without discarding the research report.
+// This is a narrow correction, not a live official-list lookup.
+function safeguardMk677WadaStatus(reply) {
+  if (typeof reply !== 'string' || !/\b(?:MK[\s-]?677|ibutamoren)\b/i.test(reply)) return reply;
+  const correction = 'prohibited by WADA under S2.2.4 (Growth Hormone Secretagogues)';
+  let updated = reply;
+  // Narrative: incorrect or uncertain WADA classifications in the MK-677 section.
+  updated = updated.replace(
+    /(?:no specific WADA status|WADA status (?:is )?unknown|not (?:explicitly|specifically) listed (?:by|under) WADA|(?:likely|probably|possibly) (?:banned|prohibited)(?: due to GH stimulation)?)/gi,
+    correction
+  );
+  // Comparison tables: preserve all other cells and change only MK-677's regulatory cell.
+  updated = updated.split('\n').map(line => {
+    if (!/\b(?:MK[\s-]?677|ibutamoren)\b/i.test(line)) return line;
+    return line.replace(/\b(?:likely|probably|possibly) (?:banned|prohibited)\b/gi, correction);
+  }).join('\n');
+  if (updated !== reply) console.warn('REGULATORY_ACCURACY_GUARD: corrected MK-677 WADA classification');
+  return updated;
+}
+
 const POLICY = `You are VanguardBio-You AI Peptide Advisor, an educational peptide research and safety assistant.
 
 CORE RESPONSIBILITIES
@@ -205,6 +225,8 @@ SCIENTIFIC EVIDENCE AND REGULATORY ACCURACY
 CURRENT REGULATORY SOURCE PRIORITY
 - PubMed articles and abstracts are not authoritative sources for current FDA approvals or anti-doping rules.
 - For BPC-157, do not repeat claims that WADA's prohibition was temporary or has ended. BPC-157 is prohibited under WADA S0 (Non-Approved Substances); direct users to the latest official WADA Prohibited List for confirmation.
+- MK-677 (ibutamoren) is explicitly prohibited by WADA under S2.2.4 (Growth Hormone Secretagogues); never describe its WADA status as unknown, merely likely, or unlisted. Apply this consistently in prose, comparison tables, and conclusions.
+- TB-500 is identified by WADA under S2.3; distinguish its anti-doping status from the clinical evidence for full-length thymosin beta-4.
 - If live official regulatory verification is unavailable, do not imply a current FDA or WADA database was checked. Clearly distinguish known regulatory context from a verified live status.
 
 1. Distinguish evidence for biological mechanisms from evidence for meaningful clinical outcomes. Increased growth hormone, IGF-1, lean body mass, or laboratory markers does not establish faster muscle repair, better strength, improved physical function, or recovery from injury.
@@ -601,7 +623,7 @@ if (!citationCheck.valid) {
 }
 
 return send(res, 200, {
-  reply: safeguardBpcWadaStatus(formatChatReply(finalReply.trim()))
+  reply: safeguardMk677WadaStatus(safeguardBpcWadaStatus(formatChatReply(finalReply.trim())))
 }, extra);
 
   } catch (err) {
