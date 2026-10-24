@@ -465,14 +465,18 @@ const citationCheck = validatePubMedCitations(
 );
 
 if (!citationCheck.valid) {
-  console.warn('PubMed citation validation failed:', {
+  console.warn(
+  'PUBMED_VALIDATION_DIAGNOSTIC ' +
+  JSON.stringify({
     sourceStatus: pubmedStatus,
     intakeInProgress,
     retrievedStudyCount: retrievedStudies.length,
+    retrievedPmids: retrievedStudies.map(study => study.pmid),
     citedCount: citationCheck.citedCount,
     invalidPmids: citationCheck.invalidPmids,
     replyLength: reply.length
-  });
+  })
+);
 
 
   return send(res, 502, {
