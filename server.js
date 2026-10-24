@@ -412,6 +412,37 @@ body: JSON.stringify({
   messages: [
     { role: 'system', content: POLICY },
     { role: 'system', content: evidenceInstructions },
+    {
+      role: 'system',
+      content: `
+FINAL RESEARCH REPORT RULES:
+
+Follow the established six-question intake.
+
+If the intake is complete and the user requests a
+report, summary, comparison, or research findings:
+
+1. Generate the completed research report immediately.
+2. Do not say "I will prepare the report."
+3. Do not say "Please allow me a moment."
+4. Do not ask the user to request the report again.
+5. Include an executive summary, evidence comparison,
+   human clinical research, safety considerations,
+   regulatory limitations, and a conclusion.
+6. Include a concise comparison table when appropriate.
+7. Use only PubMed studies supplied in the evidence context.
+8. Cite relevant retrieved studies using their exact
+   PMID identifiers in the citation format required by
+   the evidence instructions.
+9. Never invent a PMID or imply that a study supports
+   a claim it does not support.
+10. If retrieved evidence is insufficient, explain the
+    limitations rather than manufacturing citations.
+
+Keep the report educational and avoid individualized
+treatment, dosing, or sourcing recommendations.
+`
+    },
     ...messages
   ],
   temperature: 0.2,
