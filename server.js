@@ -415,7 +415,7 @@ body: JSON.stringify({
     ...messages
   ],
   temperature: 0.2,
-  max_tokens: 1800
+  max_tokens: 3500
 }),
       signal: AbortSignal.timeout(30_000)
     });
