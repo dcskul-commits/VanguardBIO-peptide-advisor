@@ -103,6 +103,36 @@ function validatePubMedCitations(reply, studies, requireCitation = false) {
   };
 }
 
+// Targeted safeguard for a known false BPC-157/WADA claim. This does not
+// replace verification against the current official WADA Prohibited List.
+const BPC_WADA_CORRECTION =
+  'BPC-157 is prohibited under WADA\'s S0 (Non-Approved Substances) category. ' +
+  'For current competition rules, verify the latest official WADA Prohibited List.';
+
+function safeguardBpcWadaStatus(reply) {
+  if (typeof reply !== 'string') return reply;
+  // Detect the topic anywhere in the response, not only within one sentence.
+  const mentionsBpc = /\bBPC[\s-]?157\b/i.test(reply);
+  const mentionsWada = /\bWADA\b|World Anti-Doping Agency/i.test(reply);
+  if (!mentionsBpc || !mentionsWada) return reply;
+
+  // False status may be split across sentences or Markdown bullets, and may
+  // use "not currently listed" rather than "not banned".
+  const falseStatus =
+    /\btemporar(?:y|ily)\s+(?:banned|prohibited)\b/i.test(reply) ||
+    /\b(?:ban|prohibition)\s+was\s+temporary\b/i.test(reply) ||
+    /\b(?:no\s+longer|not\s+currently|isn['’]t\s+currently|not\s+now)\s+(?:\w+\s+){0,5}?(?:listed|banned|prohibited)\b/i.test(reply) ||
+    /\b(?:removed|delisted|lifted)\s+(?:from|by)\s+(?:the\s+)?(?:WADA|World Anti-Doping Agency)\b/i.test(reply);
+
+  if (!falseStatus) return reply;
+  console.warn('REGULATORY_ACCURACY_GUARD: replaced misleading BPC-157 WADA response');
+  // Reject the entire misleading regulatory answer. Keeping surrounding text
+  // risks leaving contradictory statements in bullets, summaries, or citations.
+  return BPC_WADA_CORRECTION +
+    ' A PubMed review is not an authoritative source for current anti-doping rules. ' +
+    'I have not performed a live check of the current WADA list in this response.';
+}
+
 const POLICY = `You are VanguardBio-You AI Peptide Advisor, an educational peptide research and safety assistant.
 
 CORE RESPONSIBILITIES
@@ -171,6 +201,11 @@ For emergencies, advise contacting local emergency services.
 For possible poisoning, advise contacting local poison control.
 
 SCIENTIFIC EVIDENCE AND REGULATORY ACCURACY
+
+CURRENT REGULATORY SOURCE PRIORITY
+- PubMed articles and abstracts are not authoritative sources for current FDA approvals or anti-doping rules.
+- For BPC-157, do not repeat claims that WADA's prohibition was temporary or has ended. BPC-157 is prohibited under WADA S0 (Non-Approved Substances); direct users to the latest official WADA Prohibited List for confirmation.
+- If live official regulatory verification is unavailable, do not imply a current FDA or WADA database was checked. Clearly distinguish known regulatory context from a verified live status.
 
 1. Distinguish evidence for biological mechanisms from evidence for meaningful clinical outcomes. Increased growth hormone, IGF-1, lean body mass, or laboratory markers does not establish faster muscle repair, better strength, improved physical function, or recovery from injury.
 
@@ -517,7 +552,7 @@ if (!citationCheck.valid) {
 }
 
 return send(res, 200, {
-  reply: formatChatReply(reply.trim())
+  reply: safeguardBpcWadaStatus(formatChatReply(reply.trim()))
 }, extra);
 
   } catch (err) {
