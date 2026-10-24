@@ -446,9 +446,13 @@ const citationCheck = validatePubMedCitations(
 if (!citationCheck.valid) {
   console.warn('PubMed citation validation failed:', {
     sourceStatus: pubmedStatus,
+    intakeInProgress,
+    retrievedStudyCount: retrievedStudies.length,
     citedCount: citationCheck.citedCount,
-    invalidPmids: citationCheck.invalidPmids
+    invalidPmids: citationCheck.invalidPmids,
+    replyLength: reply.length
   });
+
 
   return send(res, 502, {
     error: 'The research response could not be verified against retrieved PubMed references. Please retry.'
