@@ -56,9 +56,6 @@ function formatChatReply(reply) {
 
     .trim();
 }
-
-}
-
 function validatePubMedCitations(reply, studies, requireCitation = false) {
   const allowed = new Set(studies.map(study => String(study.pmid)));
   const cited = new Set();
