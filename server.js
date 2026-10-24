@@ -306,8 +306,29 @@ const requestedPmids = [
     /\b(research|study|studies|clinical|trial|trials|evidence|safety|efficacy|effectiveness|compare|comparison|FDA|approved|approval|scientific|publication|pubmed|muscle repair|tendon repair)\b/i
       .test(latestQuestion);
 
-  const shouldSearchPubMed =
-    researchIntent && detectCompounds(latestQuestion).length > 0;
+const conversationText = messages
+  .filter(message =>
+    message.role === 'user' &&
+    typeof message.content === 'string'
+  )
+  .map(message => message.content)
+  .join('\n');
+
+const latestCompounds = detectCompounds(latestQuestion);
+const conversationCompounds = detectCompounds(conversationText);
+
+const isFinalResearchRequest =
+  /\b(final|complete|completed|generate|prepare|compile)\b/i.test(latestQuestion) &&
+  /\b(report|summary|comparison|research|evidence)\b/i.test(latestQuestion);
+
+const shouldSearchPubMed =
+  (researchIntent && latestCompounds.length > 0) ||
+  (isFinalResearchRequest && conversationCompounds.length > 0);
+
+const pubmedSearchQuestion =
+  isFinalResearchRequest && conversationCompounds.length > 0
+    ? `${conversationCompounds.join(', ')} human clinical evidence safety muscle recovery`
+    : latestQuestion;
 
   let researchContext = '';
 let pubmedStatus = 'not_requested';
@@ -316,7 +337,7 @@ let retrievedStudies = [];
   if (shouldSearchPubMed) {
     try {
       
-const studies = await searchPubMed(latestQuestion, 5);
+const studies = await searchPubMed(pubmedSearchQuestion, 5);
 
 for (const pmid of requestedPmids) {
   if (studies.some(study => study.pmid === pmid)) {
