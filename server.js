@@ -422,11 +422,15 @@ if (finishReason === 'length') {
   }, extra);
 }
 
+const isIntakeQuestion =
+  /(?:^|\n)\s*(?:question\s*[1-6]\s*[:.)-]?\s*)?/i.test(reply) &&
+  /\?\s*$/.test(reply.trim()) &&
+  /(?:what is your|what are your|are you primarily|is there a particular|how would you prefer|what remaining|would you like to)/i.test(reply);
 
 const citationCheck = validatePubMedCitations(
   reply,
   retrievedStudies,
-  pubmedStatus === 'retrieved'
+  pubmedStatus === 'retrieved' && !isIntakeQuestion
 );
 
 if (!citationCheck.valid) {
