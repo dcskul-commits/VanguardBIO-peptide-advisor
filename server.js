@@ -8,6 +8,7 @@ import {
   fetchPubMedByPMID
 } from './pubmed.js';
 import { retrieveResearchSources } from './research-sources.js';
+import { guardContentQuality, auditCitationMetadata } from './content-quality.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
@@ -738,6 +739,10 @@ SOURCE RULES:
 - Do not present a regulatory statement as live-verified. Use the known WADA classification context already in the core policy, with a qualification to consult the latest official list.
 - Do not cite a general sports-medicine review as a primary trial or use it as the sole source for a specific adverse-event rate.
 
+- Research-only or investigational status is not FDA approval. Never say "approved for research only" or imply "pharmaceutical-grade research use" is FDA authorization.
+- BPC-157 half-life values measured in rats and dogs do not establish human pharmacokinetics. Do not assign animal PK values or primarily hepatic metabolism to humans without direct human evidence.
+- For claims about efficacy and adverse events, identify the exact compound, primary study versus review, population, measured endpoint and result. Retrieval of a PMID alone cannot validate claim-level support. State uncertainty when the abstract is insufficient.
+- Do not describe registry records without independently evaluated outcomes as evidence of efficacy, or FDA advisory review as drug approval.
 - Label citation evidence types where supported by the retrieved metadata or abstract; do not guess publication type. Use primary trials for specific clinical outcomes and review articles for synthesis.
 - For safety claims, explicitly distinguish observed human adverse events, animal findings, and theoretical concerns; small samples with no reported adverse events do not establish safety.
 - For MK-677 trial claims, specify population and study design where verified; do not generalize hip-fracture safety signals or caloric-restriction nitrogen balance to exercise recovery.
@@ -920,9 +925,17 @@ if (!citationCheck.valid) {
   }, extra);
 }
 
+const qualityResult = (justAnsweredQuestionSix || isFinalResearchRequest)
+  ? guardContentQuality(finalReply.trim()) : { reply: finalReply.trim(), corrections: [] };
+if (qualityResult.corrections.length)
+  console.warn('CONTENT_QUALITY_GUARD', JSON.stringify({corrections: qualityResult.corrections}));
+const citationWarnings = (justAnsweredQuestionSix || isFinalResearchRequest)
+  ? auditCitationMetadata(qualityResult.reply, retrievedStudies) : [];
+if (citationWarnings.length)
+  console.warn('CONTENT_CITATION_DIAGNOSTIC', JSON.stringify({findings: citationWarnings}));
 const formattedReply = removeRegulatoryOnlyPubMedCitations(
   safeguardMk677WadaStatus(safeguardBpcWadaStatus(formatChatReply(removeModelEvidenceIndex(
-    (justAnsweredQuestionSix || isFinalResearchRequest) ? enforceMk677MuscleRepairClaim(finalReply.trim()) : finalReply.trim()
+    (justAnsweredQuestionSix || isFinalResearchRequest) ? enforceMk677MuscleRepairClaim(qualityResult.reply) : qualityResult.reply
   ))))
 );
 const isCompletedResearchReport = (justAnsweredQuestionSix || isFinalResearchRequest) &&
