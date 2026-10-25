@@ -613,7 +613,7 @@ retrievedStudies = studies;
         '',
         'Registry entries are not clinical results. Europe PMC records may overlap PubMed. Only citations independently verified through the PubMed retrieval pipeline should be used to support specific clinical claims.'
       ];
-      expandedEvidenceIndex = indexLines.join('\\n');
+      expandedEvidenceIndex = indexLines.join('\n');
       const trialLines = expanded.trials.map(t =>
         `TRIAL ${t.id} | ${t.title} | ${t.url} | status=${t.status} | postedResults=${t.resultsPosted} | note=${t.evidenceNote}`);
       const literatureLines = expanded.literature.map(p =>
@@ -841,7 +841,7 @@ const finalWithSources = appendOfficialRegulatorySources(
   isCompletedResearchReport
 );
 const attributedReply = isCompletedResearchReport && expandedEvidenceIndex
-  ? finalWithSources + '\\n\\n---\\n\\n' + expandedEvidenceIndex
+  ? finalWithSources + '\n\n---\n\n' + expandedEvidenceIndex
   : finalWithSources;
 return send(res, 200, { reply: attributedReply }, extra);
 
