@@ -17,7 +17,9 @@ const MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 const MAX_BODY = 24_000;
 const MAX_MESSAGES = 12;
 const MAX_MESSAGE_CHARS = 2500;
-const MAX_REQUESTS = 12;
+// Socket addresses behind Render may be shared by multiple visitors.
+// This is a coarse emergency limiter; enforce true per-client limits at a trusted edge.
+const MAX_REQUESTS = 60;
 const WINDOW_MS = 60_000;
 const MAX_TRACKED_KEYS = 5000;
 const MAX_CONCURRENT = 8;
@@ -455,8 +457,10 @@ const server = http.createServer(async (req, res) => {
   const extra = cors(origin);
   // remoteAddress is intentionally not treated as a verified end-user IP behind Render's proxy.
   // This is a coarse fallback; production needs a trusted edge limiter.
-  if (limit(req.socket.remoteAddress || 'unknown'))
+  if (limit(req.socket.remoteAddress || 'unknown')) {
+    console.warn('API_REQUEST_REJECTED', JSON.stringify({ reason: 'coarse_rate_limit', status: 429 }));
     return send(res, 429, { error: 'Too many requests. Please retry shortly.' }, { ...extra, 'Retry-After': '60' });
+  }
   if (!process.env.OPENAI_API_KEY) return send(res, 503, { error: 'AI service is not configured.' }, extra);
   let body;
   try { body = await readJSON(req); }
@@ -464,7 +468,10 @@ const server = http.createServer(async (req, res) => {
   const messages = validate(body);
   if (!messages) return send(res, 400, { error: 'Provide 1–12 valid messages (up to 2,500 characters each), ending with a user message.' }, extra);
   
-if (active >= MAX_CONCURRENT) return send(res, 503, { error: 'Service is busy. Please retry shortly.' }, { ...extra, 'Retry-After': '5' });
+if (active >= MAX_CONCURRENT) {
+  console.warn('API_REQUEST_REJECTED', JSON.stringify({ reason: 'concurrency_limit', status: 503 }));
+  return send(res, 503, { error: 'Service is busy. Please retry shortly.' }, { ...extra, 'Retry-After': '5' });
+}
 active++;
 try {
   const latestQuestion = messages.at(-1).content;
@@ -609,8 +616,12 @@ retrievedStudies = studies;
       const classifyLiterature = (p) => {
         const types = (p.publicationTypes || []).join(' ').toLowerCase();
         const title = String(p.title || '').toLowerCase();
-        if (/\b(?:rats?|mice|mouse|rodents?|in[- ]vitro|cell culture|animal model)\b/.test(title)) return 'animal/laboratory research (title-based; verify methods)';
-        if (/\b(?:systematic review|scoping review|meta-analysis|narrative review|review)\b/.test(types + ' ' + title)) return 'review/synthesis (not a primary trial)';
+        const review = /\b(?:systematic review|scoping review|meta-analysis|narrative review|literature review|review)\b/.test(types + ' ' + title);
+        const animal = /\b(?:rats?|mice|mouse|rodents?|in[- ]vitro|cell culture|animal model|preclinical)\b/.test(title);
+        // Publication design comes first: a review of animal studies is a review,
+        // not a primary animal experiment.
+        if (review) return animal ? 'review/synthesis of preclinical evidence (not a primary study)' : 'review/synthesis (not a primary trial)';
+        if (animal) return 'animal/laboratory research (title-based; verify methods)';
         if (/\b(?:randomized controlled trial|clinical trial|controlled clinical trial)\b/.test(types)) return 'human clinical trial indexed (verify population and outcomes)';
         if (/\b(?:observational study|case reports?|case series)\b/.test(types + ' ' + title)) return 'observational/case evidence (verify methods)';
         return 'study type not verified from metadata';
@@ -756,7 +767,7 @@ treatment, dosing, or sourcing recommendations.
       signal: AbortSignal.timeout(30_000)
     });
     if (!upstream.ok) {
-      console.error('OpenAI upstream HTTP status:', upstream.status);
+      console.error('OPENAI_UPSTREAM_FAILURE', JSON.stringify({ status: upstream.status }));
       const status = upstream.status === 429 ? 503 : 502;
       return send(res, status, { error: 'AI service temporarily unavailable. Please retry.' }, extra);
     }
