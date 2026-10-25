@@ -73,14 +73,39 @@ export function auditCitationMetadata(reply, studies) {
   return findings.slice(0, 12);
 }
 
+// Strip model-authored bibliographies only, never PubMed links in research
+// prose or a compound's clinical findings. Stop at the next top-level
+// section even if the model formats headings as plain text.
+export function removeModelPubMedBibliography(reply) {
+  if (typeof reply !== 'string') return reply;
+  const lines = reply.split('\n');
+  const isHeading = line => line.trim().replace(/^#{1,6}\s*/, '').replace(/\*{1,2}/g,'')
+    .replace(/^\d+[.)]\s+/, '').trim();
+  const bibliographyStart = /^(?:(?:references|pubmed references|research references)(?:\s*\([^)]*\))?|(?:compound[- ]attributed|retrieved|verified)\s+pubmed\s+(?:study\s+)?references(?:\s*\([^)]*\))?|pubmed\s+(?:study\s+)?bibliography)\s*:?\s*$/i;
+  const mainSection = /^(?:conclusion|summary|limitations|evidence gaps|research gaps|questions to discuss|questions for|safety considerations|dosing uncertainties|official regulatory|regulatory and anti-doping|retrieved evidence index|clinicaltrials\.gov and europe pmc)\b/i;
+  let skipping = false;
+  let removed = false;
+  const kept = [];
+  for (const line of lines) {
+    const title = isHeading(line);
+    if (!skipping && bibliographyStart.test(title)) {
+      skipping = true; removed = true; continue;
+    }
+    if (skipping && mainSection.test(title)) skipping = false;
+    if (!skipping) kept.push(line);
+  }
+  // If a reference heading is terminal, intentionally remove to EOF.
+  return removed ? kept.join('\n').replace(/\n{3,}/g,'\n\n').trim() : reply;
+}
+
 // Preserve traceable, source-owned citations when a long report otherwise
 // omits them. This is a BIBLIOGRAPHIC index, not a claim-level validation.
 // Cite only retrieved PubMed sources that name a compound in title/abstract.
 export function appendRetrievedPubMedReferences(reply, studies, completedReport) {
   if (!completedReport || typeof reply !== 'string' || !Array.isArray(studies) || !studies.length)
     return reply;
-  if (/^#{0,4}\s*(?:retrieved|verified|compound[- ]attributed)?\s*pubmed\s+(?:study\s+)?references\b/im.test(reply))
-    return reply; // Existing bibliography already present.
+  if (/^\s*#{0,4}\s*retrieved pubmed references \(bibliographic records\)\s*$/im.test(reply))
+    return reply; // Already appended by the backend.
   const candidates = studies.filter(s => /^\d{6,9}$/.test(String(s.pmid)) &&
     Array.isArray(s.matchedCompounds) && s.matchedCompounds.length &&
     typeof s.title === 'string' && s.title.trim());
