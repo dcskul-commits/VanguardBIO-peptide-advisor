@@ -1,30 +1,23 @@
-# VanguardBio-You backend update
+# VanguardBio Stage 2 — disabled-by-default integration
 
-Replace **both** root-level backend files in your GitHub repository:
-- `server.js`
-- `pubmed.js`
+Based on the exact `server.js` supplied on 2026-10-25 (44,728 bytes).
 
-Do not change the Airo frontend or the version 7 PDF generator. Keep `package.json` unchanged if it already uses `"type": "module"` and starts `node server.js`.
+## Files
+- `server.js`: full copy with small feature-flagged additions.
+- `server.patch`: exact unified diff for review.
+- `research-sources.js`: Stage 1 module (unchanged).
+- `research-sources.test.js`: Stage 1 tests (unchanged).
 
-## Improvements
-- Separate PubMed searches for each detected compound; balanced study selection up to 8 records.
-- Explicit publication-type and compound metadata; TB-500 evidence must not be equated with full-length thymosin beta-4.
-- NCBI request pacing and bounded transient retries.
-- PubMed records are supplied as lower-priority, untrusted context.
-- A research answer may correctly say retrieved evidence is insufficient without being rejected for lacking a citation. Invented/unretrieved PMID references still fail validation.
-- Existing `/api/chat` response shape, six-question intake, OpenAI safety policy, and PDF integration remain unchanged.
+## Safe rollout
+1. **Do not deploy immediately.** Review `server.patch` against your current GitHub `server.js`.
+2. In a separate test directory, run `npm test` and `node --check server.js`.
+3. Keep the new module next to `server.js` (the relative import requires it).
+4. Only after review, commit `server.js` and `research-sources.js` together.
+5. In Render, leave `ENABLE_EXPANDED_RESEARCH` **unset** (or set to `false`). This means the existing chat behavior is preserved; there are no new retrieval calls.
+6. For a controlled test later, enable the flag in a **separate staging Render service**, not the live production service. Verify complete intake, PDF, citations, API latency and failure behavior.
+7. Rollback: set `ENABLE_EXPANDED_RESEARCH=false` (or remove it). For a code rollback, revert the two-file commit.
 
-## Verification before publishing
-1. Commit both files together, deploy to a staging Render service if available.
-2. Run `node --check server.js` and `node --check pubmed.js`.
-3. Confirm `GET /health` returns `{"status":"ok"}`.
-4. Test general chat, a complete six-question intake, a three-compound report, an explicit PMID question, and a no-relevant-evidence question.
-5. Confirm citations are accurate against the actual studies, not merely clickable. Do not consider the PDF export a scientific verification step.
-6. Test upstream failures, PubMed outages, 429s, and large messages.
+## Scope and limitations
+This is metadata-only retrieval, not PMC full-text ingestion. It adds ClinicalTrials.gov study records and Europe PMC publication links as supplemental discovery context, only when enabled. A posted-results flag is **not** a clinical outcome. Source text is untrusted and must not override system policy. Existing PubMed PMID validation is retained. When enabled, retrieval adds latency and the existing 30-second OpenAI request timeout remains; test on staging first.
 
-## Outstanding production risks
-- The existing in-memory, `remoteAddress`-based rate limiter is **not** a trusted per-user limiter behind Render. Add edge-level rate limiting and abuse controls before broad public launch.
-- CORS does not authenticate callers. A public API can be used by scripts without an Origin header. Plan appropriate abuse prevention and usage caps.
-- Citation checking still verifies PMID membership, not scientific claim-to-source support. Human review and stronger claim validation are needed for health-related content.
-- Long reports may exceed the model output limit and return a controlled error; test full reports.
-- NCBI pacing here is per Node process; multi-instance deployments need coordinated controls.
+**No files were deployed or modified in your GitHub/Render accounts by creating this package.**
