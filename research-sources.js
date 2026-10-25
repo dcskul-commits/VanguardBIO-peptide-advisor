@@ -76,19 +76,47 @@ export async function searchEuropePMC(query, { limit = 4, fetchImpl = fetch } = 
   const data = await getJson(url, fetchImpl);
   return (data.resultList?.result ?? []).map(epmcRecord).filter(Boolean).slice(0, n);
 }
+/** Search recognized compounds independently; preserve legacy behavior for other queries. */
+export function extractResearchCompounds(query) {
+  const q = safeQuery(query);
+  const found = [];
+  if (/\b(?:bpc[\s-]?157)\b/i.test(q)) found.push('BPC-157');
+  if (/\b(?:tb[\s-]?500)\b/i.test(q)) found.push('TB-500');
+  if (/\b(?:mk[\s-]?677|ibutamoren)\b/i.test(q)) found.push('ibutamoren');
+  return found;
+}
+function dedupeRecords(records, keyFn) {
+  const seen = new Set();
+  return records.filter(record => {
+    const key = keyFn(record);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 export async function retrieveResearchSources(query, options = {}) {
   const q = safeQuery(query);
-  const searchQuery = normalizeResearchQuery(q);
-  const [trials, literature] = await Promise.allSettled([
-    searchClinicalTrials(searchQuery, options), searchEuropePMC(searchQuery, options)
-  ]);
+  const compounds = extractResearchCompounds(q);
+  const searches = compounds.length ? compounds : [normalizeResearchQuery(q)];
+  // Bound multi-compound work: max 3 compounds x 2 sources, with existing 7s timeout.
+  const results = await Promise.all(searches.map(async term => {
+    const [trials, literature] = await Promise.allSettled([
+      searchClinicalTrials(term, options), searchEuropePMC(term, options)
+    ]);
+    return { term, trials, literature };
+  }));
+  const trials = dedupeRecords(results.flatMap(r => r.trials.status === 'fulfilled'
+    ? r.trials.value.map(record => ({ ...record, matchedSearchTerm: r.term })) : []),
+    record => record.id);
+  const literature = dedupeRecords(results.flatMap(r => r.literature.status === 'fulfilled'
+    ? r.literature.value.map(record => ({ ...record, matchedSearchTerm: r.term })) : []),
+    record => record.pmid ? `PMID:${record.pmid}` : record.pmcid ? `PMCID:${record.pmcid}` : record.doi ? `DOI:${record.doi.toLowerCase()}` : record.id);
   return {
-    query: q, trials: trials.status === 'fulfilled' ? trials.value : [],
-    literature: literature.status === 'fulfilled' ? literature.value : [],
+    query: q, trials, literature,
     status: {
-      clinicalTrials: trials.status === 'fulfilled' ? 'ok' : 'unavailable',
-      europePMC: literature.status === 'fulfilled' ? 'ok' : 'unavailable'
+      clinicalTrials: results.some(r => r.trials.status === 'fulfilled') ? 'ok' : 'unavailable',
+      europePMC: results.some(r => r.literature.status === 'fulfilled') ? 'ok' : 'unavailable'
     },
-    disclaimer: 'Retrieved metadata is not proof of clinical benefit. Do not treat registry enrollment, abstracts, or publication types as independently verified outcomes.'
+    disclaimer: 'Retrieved metadata is not proof of clinical benefit. A matched search term is not proof a compound was administered or studied. Verify study interventions, populations, methods and outcomes before citing efficacy.'
   };
 }
