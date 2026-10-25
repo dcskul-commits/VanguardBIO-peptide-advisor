@@ -1,13 +1,7 @@
-/**
- * VanguardBio Stage 1 — optional research source retrieval (ESM, Node 18+).
- * Not connected to the production chat path. No external dependencies.
- * Sources: ClinicalTrials.gov API v2, Europe PMC REST API, NCBI PMC OA metadata.
- * Research metadata is untrusted input, never executable instructions.
- */
+/** VanguardBio Stage 2 — source metadata retrieval (ESM, Node 18+). */
 const MAX_QUERY = 180;
 const MAX_RECORDS = 5;
 const TIMEOUT_MS = 7000;
-
 function cleanText(value, limit = 900) {
   return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, limit);
 }
@@ -15,6 +9,15 @@ function safeQuery(query) {
   const q = cleanText(query, MAX_QUERY);
   if (!q || q.length < 2) throw new TypeError('A research query of at least 2 characters is required');
   return q;
+}
+/** Narrow, explicitly mapped compound names only; unknown queries are not rewritten. */
+export function normalizeResearchQuery(query) {
+  const q = safeQuery(query);
+  const matches = [];
+  if (/\b(?:mk[\s-]?677|ibutamoren)\b/i.test(q)) matches.push('ibutamoren');
+  if (/\bbpc[\s-]?157\b/i.test(q)) matches.push('BPC-157');
+  if (/\btb[\s-]?500\b/i.test(q)) matches.push('TB-500');
+  return matches.length === 1 ? matches[0] : q;
 }
 async function getJson(url, fetchImpl = fetch) {
   const response = await fetchImpl(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
@@ -36,7 +39,8 @@ function nctRecord(study) {
     enrollment: d.enrollmentInfo?.count ?? null,
     status: cleanText(status.overallStatus, 60),
     primaryOutcomes: (outcomes.primaryOutcomes ?? []).slice(0, 3).map(x => cleanText(x.measure, 160)),
-    resultsPosted, lastUpdated: cleanText(status.studyFirstPostDateStruct?.date, 20),
+    resultsPosted,
+    lastUpdated: cleanText(status.studyLastUpdatePostDateStruct?.date, 20),
     evidenceNote: resultsPosted ? 'Registry results are posted; assess actual outcome data before drawing conclusions.' : 'Registry record only; registration does not demonstrate efficacy or safety.'
   };
 }
@@ -72,15 +76,14 @@ export async function searchEuropePMC(query, { limit = 4, fetchImpl = fetch } = 
   const data = await getJson(url, fetchImpl);
   return (data.resultList?.result ?? []).map(epmcRecord).filter(Boolean).slice(0, n);
 }
-/** Searches independently; one unavailable source does not hide results from the other. */
 export async function retrieveResearchSources(query, options = {}) {
   const q = safeQuery(query);
+  const searchQuery = normalizeResearchQuery(q);
   const [trials, literature] = await Promise.allSettled([
-    searchClinicalTrials(q, options), searchEuropePMC(q, options)
+    searchClinicalTrials(searchQuery, options), searchEuropePMC(searchQuery, options)
   ]);
   return {
-    query: q,
-    trials: trials.status === 'fulfilled' ? trials.value : [],
+    query: q, trials: trials.status === 'fulfilled' ? trials.value : [],
     literature: literature.status === 'fulfilled' ? literature.value : [],
     status: {
       clinicalTrials: trials.status === 'fulfilled' ? 'ok' : 'unavailable',
