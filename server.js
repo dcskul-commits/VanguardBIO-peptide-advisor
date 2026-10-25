@@ -583,21 +583,21 @@ retrievedStudies = studies;
   // The backend owns discovery attribution. Never allow a model-produced
   // registry/publication index to compete with the retrieved source list.
   const removeModelEvidenceIndex = (text) => {
-    const lines = text.split('\\n');
+    const lines = text.split('\n');
     const kept = [];
     let skipping = false;
     for (const line of lines) {
-      const heading = line.trim().replace(/^#{1,6}\\s*/, '').replace(/\\*\\*/g, '');
-      if (!skipping && /^(?:(?:\\d+)[.)]\\s*)?(?:compound[- ]attributed|retrieved) evidence index\\b/i.test(heading)) {
+      const heading = line.trim().replace(/^#{1,6}\s*/, '').replace(/\*\*/g, '');
+      if (!skipping && /^(?:(?:\d+)[.)]\s*)?(?:compound[- ]attributed|retrieved) evidence index\b/i.test(heading)) {
         skipping = true;
         continue;
       }
-      if (skipping && /^(?:#{1,6}\\s*)?(?:(?:\\d+)[.)]\\s+)?(?:official regulatory|anti-doping|conclusion|references|questions to discuss|research gaps|safety considerations|dosing uncertainties)\\b/i.test(heading)) {
+      if (skipping && /^(?:#{1,6}\s*)?(?:(?:\d+)[.)]\s+)?(?:official regulatory|anti-doping|conclusion|references|questions to discuss|research gaps|safety considerations|dosing uncertainties)\b/i.test(heading)) {
         skipping = false;
       }
       if (!skipping) kept.push(line);
     }
-    return kept.join('\\n').replace(/\\n{3,}/g, '\\n\\n').trim();
+    return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   };
   let expandedEvidenceIndex = '';
   let expandedResearchContext = '';
@@ -609,10 +609,10 @@ retrievedStudies = studies;
       const classifyLiterature = (p) => {
         const types = (p.publicationTypes || []).join(' ').toLowerCase();
         const title = String(p.title || '').toLowerCase();
-        if (/\\b(?:rats?|mice|mouse|rodents?|in[- ]vitro|cell culture|animal model)\\b/.test(title)) return 'animal/laboratory research (title-based; verify methods)';
-        if (/\\b(?:systematic review|scoping review|meta-analysis|narrative review|review)\\b/.test(types + ' ' + title)) return 'review/synthesis (not a primary trial)';
-        if (/\\b(?:randomized controlled trial|clinical trial|controlled clinical trial)\\b/.test(types)) return 'human clinical trial indexed (verify population and outcomes)';
-        if (/\\b(?:observational study|case reports?|case series)\\b/.test(types + ' ' + title)) return 'observational/case evidence (verify methods)';
+        if (/\b(?:rats?|mice|mouse|rodents?|in[- ]vitro|cell culture|animal model)\b/.test(title)) return 'animal/laboratory research (title-based; verify methods)';
+        if (/\b(?:systematic review|scoping review|meta-analysis|narrative review|review)\b/.test(types + ' ' + title)) return 'review/synthesis (not a primary trial)';
+        if (/\b(?:randomized controlled trial|clinical trial|controlled clinical trial)\b/.test(types)) return 'human clinical trial indexed (verify population and outcomes)';
+        if (/\b(?:observational study|case reports?|case series)\b/.test(types + ' ' + title)) return 'observational/case evidence (verify methods)';
         return 'study type not verified from metadata';
       };
       const indexLines = [
