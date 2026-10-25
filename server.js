@@ -595,7 +595,7 @@ retrievedStudies = studies;
     let skipping = false;
     for (const line of lines) {
       const heading = line.trim().replace(/^#{1,6}\s*/, '').replace(/\*\*/g, '');
-      if (!skipping && /^(?:(?:\d+)[.)]\s*)?(?:compound[- ]attributed|retrieved) evidence index\b/i.test(heading)) {
+      if (!skipping && /^(?:(?:\d+)[.)]\s*)?(?:(?:compound[- ]attributed|retrieved) evidence index\b|clinicaltrials\.gov\s+and\s+europe\s+pmc\s+(?:discovery|evidence)\s+index\b)/i.test(heading)) {
         skipping = true;
         continue;
       }
