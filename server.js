@@ -121,6 +121,66 @@ function removeRegulatoryOnlyPubMedCitations(reply) {
   return lines.join('\n');
 }
 
+// These links are official source documents, not PubMed articles. They were
+// reviewed while preparing this release; the running server does not query
+// WADA or FDA live. Do not present these as a real-time regulatory check.
+const REGULATORY_SOURCES = Object.freeze({
+  wada2026: 'https://www.wada-ama.org/sites/default/files/2025-09/2026list_en_final_clean_september_2025.pdf',
+  wadaCurrent: 'https://www.wada-ama.org/en/prohibited-list',
+  fdaBpcTb500: 'https://www.fda.gov/advisory-committees/advisory-committee-calendar/july-23-24-2026-meeting-pharmacy-compounding-advisory-committee-07232026',
+  fdaSafety: 'https://www.fda.gov/drugs/human-drug-compounding/certain-bulk-drug-substances-use-compounding-may-present-significant-safety-risks',
+  fdaMk677: 'https://www.fda.gov/drugs/medication-health-fraud-notifications/agebox-ikids-growth-day-formula-may-be-harmful-due-hidden-ingredient',
+  drugsAtFda: 'https://www.accessdata.fda.gov/scripts/cder/daf/'
+});
+
+// Append source provenance only to completed, substantive research reports.
+// This avoids altering the six intake questions or ordinary brief answers.
+function appendOfficialRegulatorySources(reply, completedReport) {
+  if (!completedReport || typeof reply !== 'string') return reply;
+  if (/## Official regulatory sources \(2026 reference\)/i.test(reply)) return reply;
+  const substances = detectCompounds(reply);
+  const hasRelevant = substances.some(name => ['BPC-157', 'TB-500', 'MK-677'].includes(name));
+  if (!hasRelevant) return reply;
+  const rows = [
+    '\n\n## Official regulatory sources (2026 reference)',
+    `- **WADA 2026 Prohibited List (effective January 1, 2026):** [Official list](${REGULATORY_SOURCES.wada2026}). BPC-157: S0 (non-approved substances); TB-500: S2.3 (growth factors and growth factor modulators); MK-677/ibutamoren: S2.2.4 (growth hormone releasing factors/secretagogues).`,
+    `- **FDA review of BPC-157 and TB-500:** [July 2026 advisory committee materials](${REGULATORY_SOURCES.fdaBpcTb500}). These are regulatory review materials, not evidence of FDA approval or a final agency decision.`,
+    `- **FDA safety and compounding context:** [Potential safety risks for certain bulk drug substances](${REGULATORY_SOURCES.fdaSafety}); [FDA statement on ibutamoren (MK-677)](${REGULATORY_SOURCES.fdaMk677}).`,
+    `- **Check current status independently:** [WADA prohibited list](${REGULATORY_SOURCES.wadaCurrent}) and [FDA Drugs@FDA](${REGULATORY_SOURCES.drugsAtFda}). The chatbot does not perform a live WADA/FDA database check.`,
+    '\n**Source distinction:** PubMed citations support research findings only; the official sources above support regulatory context. FDA compounding discussions are not marketing approvals.'
+  ];
+  return reply + rows.join('\n');
+}
+
+// In a compound-specific bibliography, remove PubMed references whose
+// indexed title/abstract does not explicitly identify the named compound.
+// This is a conservative metadata check, not semantic verification of claims.
+function filterCompoundBibliography(reply, studies) {
+  if (!studies?.length) return reply;
+  const byPmid = new Map(studies.map(study => [String(study.pmid), study]));
+  let inReferences = false;
+  let removed = 0;
+  const output = reply.split('\n').map(line => {
+    if (/^\s{0,3}(?:#{1,6}\s*)?(?:references|pubmed references|research references)\s*:?\s*$/i.test(line)) {
+      inReferences = true;
+      return line;
+    }
+    if (inReferences && /^\s{0,3}(?:#{1,6}\s*)?(?:conclusion|summary|limitations|official regulatory sources)\s*:?\s*$/i.test(line)) inReferences = false;
+    if (!inReferences) return line;
+    const match = line.match(/^\s*[-*]\s*(BPC[\s-]?157|TB[\s-]?500|MK[\s-]?677|ibutamoren)\s*:/i);
+    if (!match) return line;
+    const name = /BPC/i.test(match[1]) ? 'BPC-157' : /TB/i.test(match[1]) ? 'TB-500' : 'MK-677';
+    return line.replace(/(?:\[PMID:\s*(\d{6,9})\]\(https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/\1\/?\)|PMID:\s*(\d{6,9})\s*\(https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/\2\/?\))/gi, (citation, a, b) => {
+      const study = byPmid.get(a || b);
+      if (!study || (study.matchedCompounds || []).includes(name)) return citation;
+      removed++;
+      return '';
+    }).replace(/,\s*,/g, ',').replace(/:\s*,/g, ':').replace(/,\s*$/g, '');
+  });
+  if (removed) console.warn('COMPOUND_BIBLIOGRAPHY_GUARD: removed', removed, 'compound-mismatched reference(s)');
+  return output.join('\n');
+}
+
 // Targeted safeguard for a known false BPC-157/WADA claim. This does not
 // replace verification against the current official WADA Prohibited List.
 const BPC_WADA_CORRECTION =
@@ -493,6 +553,8 @@ SOURCE RULES:
 - PUBLICATION TYPE IS NOT AN OUTCOME: a review or systematic review summarizes literature and is not itself a human intervention trial. State the design of the underlying study when known; otherwise say not verified.
 - Before each citation, check that the abstract explicitly supports the claim's EXACT compound, population, measured endpoint, and direction of effect. If any of these are unclear, narrow the claim or omit the citation. Do not infer recovery from GH, IGF-1, fat-free mass, or bone markers.
 - TB-500 fragments and full-length thymosin beta-4 are not interchangeable. Cite full-length thymosin beta-4 research only as research on full-length thymosin beta-4.
+- For completed research reports, the server will append a separate official regulatory-source section with WADA 2026 and FDA source links. Do not invent official source links, claim that the backend fetched them live, or attach PubMed citations to FDA/WADA-only claims.
+- WADA 2026 category labels: S0 = Non-Approved Substances; S2.3 = Growth Factors and Growth Factor Modulators (NOT simply "Peptides"); S2.2.4 = Growth Hormone Releasing Factors (including growth hormone secretagogues).
 - PubMed records are NOT authoritative for FDA approval or WADA classification. Do not attach a PMID to a regulatory-only sentence, bullet, table cell, or regulatory reference list. Refer readers to the official WADA Prohibited List (https://www.wada-ama.org/en/prohibited-list) and FDA Drugs@FDA (https://www.accessdata.fda.gov/scripts/cder/daf/) for independent current checks; these official sites were NOT fetched live by this request.
 - Do not present a regulatory statement as live-verified. Use the known WADA classification context already in the core policy, with a qualification to consult the latest official list.
 - Do not cite a general sports-medicine review as a primary trial or use it as the sole source for a specific adverse-event rate.
@@ -664,9 +726,17 @@ if (!citationCheck.valid) {
   }, extra);
 }
 
-return send(res, 200, {
-  reply: removeRegulatoryOnlyPubMedCitations(safeguardMk677WadaStatus(safeguardBpcWadaStatus(formatChatReply(finalReply.trim()))))
-}, extra);
+const formattedReply = removeRegulatoryOnlyPubMedCitations(
+  safeguardMk677WadaStatus(safeguardBpcWadaStatus(formatChatReply(finalReply.trim())))
+);
+const isCompletedResearchReport = (justAnsweredQuestionSix || isFinalResearchRequest) &&
+  formattedReply.length > 1200 &&
+  /(?:educational research|executive summary|evidence comparison|human clinical evidence)/i.test(formattedReply);
+const finalWithSources = appendOfficialRegulatorySources(
+  filterCompoundBibliography(formattedReply, retrievedStudies),
+  isCompletedResearchReport
+);
+return send(res, 200, { reply: finalWithSources }, extra);
 
   } catch (err) {
     const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
