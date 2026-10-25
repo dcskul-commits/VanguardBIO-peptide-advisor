@@ -190,15 +190,15 @@ const BPC_WADA_CORRECTION =
   'BPC-157 is prohibited under WADA\'s S0 (Non-Approved Substances) category. ' +
   'For current competition rules, verify the latest official WADA Prohibited List.';
 
+
 function safeguardBpcWadaStatus(reply) {
   if (typeof reply !== 'string') return reply;
-  // Detect the topic anywhere in the response, not only within one sentence.
+
   const mentionsBpc = /\bBPC[\s-]?157\b/i.test(reply);
   const mentionsWada = /\bWADA\b|World Anti-Doping Agency/i.test(reply);
+
   if (!mentionsBpc || !mentionsWada) return reply;
 
-  // False status may be split across sentences or Markdown bullets, and may
-  // use "not currently listed" rather than "not banned".
   const falseStatus =
     /\btemporar(?:y|ily)\s+(?:banned|prohibited)\b/i.test(reply) ||
     /\b(?:ban|prohibition)\s+was\s+temporary\b/i.test(reply) ||
@@ -206,12 +206,36 @@ function safeguardBpcWadaStatus(reply) {
     /\b(?:removed|delisted|lifted)\s+(?:from|by)\s+(?:the\s+)?(?:WADA|World Anti-Doping Agency)\b/i.test(reply);
 
   if (!falseStatus) return reply;
-  console.warn('REGULATORY_ACCURACY_GUARD: replaced misleading BPC-157 WADA response');
-  // Reject the entire misleading regulatory answer. Keeping surrounding text
-  // risks leaving contradictory statements in bullets, summaries, or citations.
-  return BPC_WADA_CORRECTION +
-    ' A PubMed review is not an authoritative source for current anti-doping rules. ' +
-    'I have not performed a live check of the current WADA list in this response.';
+
+  console.warn(
+    'REGULATORY_ACCURACY_GUARD: BPC-157 WADA correction applied'
+  );
+
+  const correction =
+    "BPC-157 is prohibited under WADA's S0 " +
+    "(Non-Approved Substances) category.";
+
+  // Preserve the research report instead of replacing it.
+  return reply
+    .split('\n')
+    .map(line => {
+      if (!/\bBPC[\s-]?157\b/i.test(line) &&
+          !/\bWADA\b/i.test(line)) {
+        return line;
+      }
+
+      const incorrect =
+        /\btemporar(?:y|ily)\s+(?:banned|prohibited)\b/i.test(line) ||
+        /\b(?:no\s+longer|not\s+currently|isn['’]t\s+currently|not\s+now)\s+(?:\w+\s+){0,5}?(?:listed|banned|prohibited)\b/i.test(line);
+
+      if (!incorrect) return line;
+
+      return line.replace(
+        /[^.!?\n]*(?:temporar(?:y|ily)\s+(?:banned|prohibited)|(?:no\s+longer|not\s+currently|isn['’]t\s+currently|not\s+now)\s+(?:\w+\s+){0,5}?(?:listed|banned|prohibited))[^.!?\n]*[.!?]?/gi,
+        correction
+      );
+    })
+    .join('\n');
 }
 
 // Correct known MK-677 WADA misclassifications without discarding the research report.
