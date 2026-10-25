@@ -66,6 +66,53 @@ function formatChatReply(reply) {
 
     .trim();
 }
+// Preserve human biomarker and other trial findings without implying proven
+// post-exercise muscle repair from MK-677 studies of different endpoints.
+function enforceMk677MuscleRepairClaim(reply) {
+  if (typeof reply !== 'string' || !/\b(?:MK[\s-]?677|ibutamoren)\b/i.test(reply) ||
+      !/human\s+RCTs?\s+for\s+muscle\s+repair/i.test(reply)) return reply;
+  const correction = 'No RCTs demonstrating accelerated post-exercise muscle repair; human trials assess other outcomes';
+  const lines = reply.split('\n');
+  let corrected = 0;
+  let headerCell = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].includes('|')) { headerCell = -1; continue; }
+    const cells = lines[i].split('|');
+    const col = cells.findIndex(c => /human\s+RCTs?\s+for\s+muscle\s+repair/i.test(c));
+    if (col !== -1) { headerCell = col; continue; }
+    if (headerCell < 0 || headerCell >= cells.length ||
+        !/\b(?:MK[\s-]?677|ibutamoren)\b/i.test(cells.join(' '))) continue;
+    if (/^\s*(?:yes\b|(?:some|several|multiple)\s+(?:RCTs?|trials?)\b)/i.test(cells[headerCell])) {
+      cells[headerCell] = ' ' + correction + ' ';
+      lines[i] = cells.join('|');
+      corrected++;
+    }
+  }
+  // Some reports render comparison-table rows as a vertical field/value list.
+  let inComparison = false;
+  let mkRow = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim().replace(/^#{1,6}\s*/, '');
+    if (/^(?:\d+[.)]\s*)?(?:(?:comparative|comparison|evidence)\s+){0,3}table\b/i.test(line)) {
+      inComparison = true; mkRow = false;
+    } else if (inComparison && /^(?:\d+[.)]\s*)?(?:safety|regulatory|dosing|conclusion|detailed\s+compound)/i.test(line)) {
+      inComparison = false; mkRow = false;
+    }
+    if (!inComparison || lines[i].includes('|')) continue;
+    if (/^\**(?:MK[\s-]?677|ibutamoren)\b/i.test(line)) mkRow = true;
+    if (/^\**(?:BPC[\s-]?157|TB[\s-]?500)\b/i.test(line)) mkRow = false;
+    if (!mkRow || !/^human\s+RCTs?\s+for\s+muscle\s+repair\s*:?\s*$/i.test(line)) continue;
+    let next = i + 1;
+    while (next < lines.length && !lines[next].trim()) next++;
+    if (next < lines.length && /^\s*(?:yes\b|(?:some|several|multiple)\s+(?:RCTs?|trials?)\b)/i.test(lines[next])) {
+      lines[next] = correction;
+      corrected++;
+    }
+  }
+  if (corrected) console.warn('CLINICAL_CLAIM_GUARD', JSON.stringify({ compound: 'MK-677', field: 'human_rcts_for_muscle_repair', corrected }));
+  return lines.join('\n');
+}
+
 function validatePubMedCitations(reply, studies, requireCitation = false) {
   const allowed = new Set(studies.map(study => String(study.pmid)));
   const cited = new Set();
@@ -874,7 +921,9 @@ if (!citationCheck.valid) {
 }
 
 const formattedReply = removeRegulatoryOnlyPubMedCitations(
-  safeguardMk677WadaStatus(safeguardBpcWadaStatus(formatChatReply(removeModelEvidenceIndex(finalReply.trim()))))
+  safeguardMk677WadaStatus(safeguardBpcWadaStatus(formatChatReply(removeModelEvidenceIndex(
+    (justAnsweredQuestionSix || isFinalResearchRequest) ? enforceMk677MuscleRepairClaim(finalReply.trim()) : finalReply.trim()
+  ))))
 );
 const isCompletedResearchReport = (justAnsweredQuestionSix || isFinalResearchRequest) &&
   formattedReply.length > 1200 &&
