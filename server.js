@@ -586,7 +586,7 @@ retrievedStudies = studies;
     try {
       const expanded = await retrieveResearchSources(pubmedSearchQuestion, { limit: 3 });
       const safeEvidenceText = (value, limit = 200) =>
-        String(value ?? '').replace(/[\\r\\n|<>]/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, limit);
+        String(value ?? '').replace(/[\r\n|<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, limit);
       const indexLines = [
         '## Retrieved evidence index (discovery records)',
         '',
