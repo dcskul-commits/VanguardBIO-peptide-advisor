@@ -37,27 +37,67 @@ export function guardContentQuality(reply) {
   return {reply: lines.join('\n'), corrections: [...new Set(corrections)]};
 }
 
-// Diagnostic only: PMID retrieval and metadata do not establish exact endpoint support.
+// Diagnostic only. Inspect final report text and only sections with a single
+// named compound heading; cross-compound tables/references are not attributed
+// to the most recently mentioned compound.
 export function auditCitationMetadata(reply, studies) {
   if (typeof reply !== 'string' || !Array.isArray(studies)) return [];
   const byPmid = new Map(studies.map(s => [String(s.pmid), s]));
-  let section = '';
   const findings = [];
-  for (const line of reply.split('\n')) {
-    const heading = line.trim().replace(/^#{1,6}\s*/, '').replace(/^\d+(?:\.\d+)*[.)]?\s+/, '');
-    if (/^(?:BPC[\s-]?157|TB[\s-]?500|MK[\s-]?677|ibutamoren)\b/i.test(heading))
-      section = /^BPC/i.test(heading) ? 'BPC-157' : /^TB/i.test(heading) ? 'TB-500' : 'MK-677';
-    if (/^(?:conclusion|references|official regulatory|retrieved evidence index)\b/i.test(heading)) section = '';
+  let section = '';
+  const heading = line => line.trim().replace(/^#{1,6}\s*/, '')
+    .replace(/^\d+(?:\.\d+)*[.)]?\s+/, '').replace(/\*/g, '').trim();
+  const compoundHeading = /^(?:BPC[\s-]?157|TB[\s-]?500|MK[\s-]?677|ibutamoren)(?:\s*\([^)]*\))?\s*:?\s*$/i;
+  const stopHeading = /^(?:comparison|comparative|evidence gaps|safety and regulatory|safety considerations|dosing|questions|conclusion|references|pubmed|official regulatory|retrieved evidence|clinicaltrials|europe pmc|educational research|executive summary)\b/i;
+  const knownSubheading = /^(?:human clinical evidence|preclinical evidence|human evidence|safety|regulatory|research gaps|evidence quality|clinical outcomes|dosing and quality)\s*:?\s*$/i;
+  for (const [i, line] of reply.split('\n').entries()) {
+    const h = heading(line);
+    if (compoundHeading.test(h)) section = /BPC/i.test(h) ? 'BPC-157' : /TB/i.test(h) ? 'TB-500' : 'MK-677';
+    else if (stopHeading.test(h)) section = '';
+    else if (section && (/^#{1,4}\s/.test(line) || /^\d+[.)]\s+\p{L}/u.test(line)) && !knownSubheading.test(h)) section = '';
     if (!section || !/\bPMID\b|pubmed\.ncbi\.nlm\.nih\.gov/i.test(line)) continue;
-    for (const pmid of new Set([...line.matchAll(/(?:PMID\s*:?\s*\[?|pubmed\.ncbi\.nlm\.nih\.gov\/)(\d{6,9})/gi)].map(m => m[1]))) {
+    const pmids = [...new Set([...line.matchAll(/(?:PMID\s*:?\s*\[?|pubmed\.ncbi\.nlm\.nih\.gov\/)(\d{6,9})/gi)].map(m=>m[1]))];
+    for (const pmid of pmids) {
       const study = byPmid.get(pmid);
-      if (!study) continue; // Existing validator rejects unrecognized PMIDs.
+      if (!study) continue;
+      const base = { pmid, section, line: i + 1, excerpt: line.trim().slice(0, 150) };
       if (study.matchedCompounds?.length && !study.matchedCompounds.includes(section))
-        findings.push({type: 'possible_compound_mismatch',pmid,section});
-      if (/\b(?:review|meta-analysis)\b/i.test((study.publicationTypes||[]).join(' ')) &&
-          /\b(?:RCT|randomized|controlled trial)\b/i.test(line) && !/\b(?:review|synthesi[sz])\b/i.test(line))
-        findings.push({type:'review_near_trial_claim',pmid,section});
+        findings.push({type:'possible_compound_mismatch', ...base});
+      const types = (study.publicationTypes || []).join(' ').toLowerCase();
+      if (/\b(?:review|meta-analysis)\b/.test(types) &&
+          /\b(?:RCT|randomized|controlled trial)\b/i.test(line) &&
+          !/\b(?:review|synthesi[sz])\b/i.test(line))
+        findings.push({type:'review_near_trial_claim', ...base});
     }
   }
-  return findings.slice(0,12);
+  return findings.slice(0, 12);
+}
+
+// Preserve traceable, source-owned citations when a long report otherwise
+// omits them. This is a BIBLIOGRAPHIC index, not a claim-level validation.
+// Cite only retrieved PubMed sources that name a compound in title/abstract.
+export function appendRetrievedPubMedReferences(reply, studies, completedReport) {
+  if (!completedReport || typeof reply !== 'string' || !Array.isArray(studies) || !studies.length)
+    return reply;
+  if (/^#{0,4}\s*(?:retrieved|verified|compound[- ]attributed)?\s*pubmed\s+(?:study\s+)?references\b/im.test(reply))
+    return reply; // Existing bibliography already present.
+  const candidates = studies.filter(s => /^\d{6,9}$/.test(String(s.pmid)) &&
+    Array.isArray(s.matchedCompounds) && s.matchedCompounds.length &&
+    typeof s.title === 'string' && s.title.trim());
+  if (!candidates.length) return reply;
+  const unique = new Map(candidates.map(s => [String(s.pmid),s]));
+  const entries = [...unique.values()].slice(0, 8).map(s => {
+    const types = (s.publicationTypes||[]).join(' ').toLowerCase();
+    const classification = /randomized controlled trial/.test(types) ? 'indexed randomized clinical trial'
+      : /\bclinical trial\b/.test(types) ? 'indexed clinical trial'
+      : /\b(systematic review|meta-analysis|review)\b/.test(types) ? 'review/synthesis, not a primary trial'
+      : 'study design not established from metadata';
+    const title = s.title.replace(/[\n\r|]/g,' ').slice(0,180);
+    const names = s.matchedCompounds.join(', ');
+    return '- [PMID: '+s.pmid+'](https://pubmed.ncbi.nlm.nih.gov/'+s.pmid+
+      '/) — '+title+'; indexed as: '+classification+'; compounds mentioned: '+names+'.';
+  });
+  return reply + '\n\n### Retrieved PubMed references (bibliographic records)\n\n' +
+    'These links are PubMed records retrieved for this request. Inclusion does not verify the exact population, intervention, endpoint or claim in this report; verify each abstract and study before citing an outcome.\n\n' +
+    entries.join('\n');
 }
