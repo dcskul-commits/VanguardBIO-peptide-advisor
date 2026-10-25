@@ -8,7 +8,7 @@ import {
   fetchPubMedByPMID
 } from './pubmed.js';
 import { retrieveResearchSources } from './research-sources.js';
-import { guardContentQuality, auditCitationMetadata } from './content-quality.js';
+import { guardContentQuality, auditCitationMetadata, appendRetrievedPubMedReferences } from './content-quality.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
@@ -726,6 +726,7 @@ SOURCE RULES:
 - Never generate an NCT/Europe PMC attribution table or a separate retrieved evidence index within your answer. The backend appends the authoritative discovery index after report generation. Discuss clinical evidence and cite verified PubMed sources in the prose as usual.
 - Use clickable PubMed links in the form [PMID: 12345678](https://pubmed.ncbi.nlm.nih.gov/12345678/).
 
+- When describing a named human clinical trial or its outcome, cite a relevant PubMed record supplied in this request immediately beside the claim if the abstract supports the exact compound, population, intervention and endpoint. If that cannot be established, explicitly say citation-level verification was insufficient; never invent a PMID. The backend may append bibliographic references, which do not independently validate the report's specific claims.
 - When RESEARCH SOURCE STATUS is retrieved, cite relevant records for factual research claims. If none of the retrieved records supports the requested claim, explicitly state that the retrieved evidence is insufficient; do not cite an irrelevant study merely to satisfy a citation requirement.
 - Use the exact PMID and URL supplied in the PubMed research data.
 - Never invent a citation or cite a record that does not support the statement.
@@ -929,10 +930,6 @@ const qualityResult = (justAnsweredQuestionSix || isFinalResearchRequest)
   ? guardContentQuality(finalReply.trim()) : { reply: finalReply.trim(), corrections: [] };
 if (qualityResult.corrections.length)
   console.warn('CONTENT_QUALITY_GUARD', JSON.stringify({corrections: qualityResult.corrections}));
-const citationWarnings = (justAnsweredQuestionSix || isFinalResearchRequest)
-  ? auditCitationMetadata(qualityResult.reply, retrievedStudies) : [];
-if (citationWarnings.length)
-  console.warn('CONTENT_CITATION_DIAGNOSTIC', JSON.stringify({findings: citationWarnings}));
 const formattedReply = removeRegulatoryOnlyPubMedCitations(
   safeguardMk677WadaStatus(safeguardBpcWadaStatus(formatChatReply(removeModelEvidenceIndex(
     (justAnsweredQuestionSix || isFinalResearchRequest) ? enforceMk677MuscleRepairClaim(qualityResult.reply) : qualityResult.reply
@@ -941,10 +938,17 @@ const formattedReply = removeRegulatoryOnlyPubMedCitations(
 const isCompletedResearchReport = (justAnsweredQuestionSix || isFinalResearchRequest) &&
   formattedReply.length > 1200 &&
   /(?:educational research|executive summary|evidence comparison|human clinical evidence)/i.test(formattedReply);
-const finalWithSources = appendOfficialRegulatorySources(
-  filterCompoundBibliography(formattedReply, retrievedStudies),
-  isCompletedResearchReport
+const bibliographyFilteredReply = filterCompoundBibliography(formattedReply, retrievedStudies);
+const withPubMedReferences = appendRetrievedPubMedReferences(
+  bibliographyFilteredReply, retrievedStudies, isCompletedResearchReport
 );
+const finalWithSources = appendOfficialRegulatorySources(withPubMedReferences, isCompletedResearchReport);
+// Check only the same content that is returned to the user, after safeguards,
+// bibliography filtering and citation preservation, before discovery metadata.
+const citationWarnings = isCompletedResearchReport
+  ? auditCitationMetadata(finalWithSources, retrievedStudies) : [];
+if (citationWarnings.length)
+  console.warn('CONTENT_CITATION_DIAGNOSTIC', JSON.stringify({ findings: citationWarnings }));
 const attributedReply = isCompletedResearchReport && expandedEvidenceIndex
   ? finalWithSources + '\n\n---\n\n' + expandedEvidenceIndex
   : finalWithSources;
