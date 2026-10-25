@@ -1,1 +1,0 @@
-{"name":"vanguardbio-research-stage1","private":true,"type":"module","scripts":{"test":"node --test research-sources.test.js"}}
