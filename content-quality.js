@@ -19,8 +19,8 @@ export function guardContentQuality(reply) {
       corrections.push('research_approval_language');
     }
     if ((inBpc || /\bBPC[\s-]?157\b/i.test(next)) &&
-        /(?:half[- ]life\s+(?:is\s+)?(?:under|less than|<)\s*\d+|metaboli[sz](?:ed|ation)?\s+primarily\s+(?:in\s+)?(?:the\s+)?liver|(?:primarily|mainly)\s+(?:hepatic|liver)\s+metaboli[sz])/i.test(next)) {
-      const bad = /(?:half[- ]life\s+(?:is\s+)?(?:under|less than|<)\s*\d+|metaboli[sz](?:ed|ation)?\s+primarily\s+(?:in\s+)?(?:the\s+)?liver|(?:primarily|mainly)\s+(?:hepatic|liver)\s+metaboli[sz])/i;
+        /(?:half[- ]life\s+(?:is\s+)?(?:under|less than|<)\s*\d+|(?:metabolism\s+primarily\s+(?:hepatic|in\s+(?:the\s+)?liver)|metaboli[sz](?:ed|ation)?\s+primarily\s+(?:in\s+)?(?:the\s+)?liver)|(?:primarily|mainly)\s+(?:hepatic|liver)\s+metaboli[sz])/i.test(next)) {
+      const bad = /(?:half[- ]life\s+(?:is\s+)?(?:under|less than|<)\s*\d+|(?:metabolism\s+primarily\s+(?:hepatic|in\s+(?:the\s+)?liver)|metaboli[sz](?:ed|ation)?\s+primarily\s+(?:in\s+)?(?:the\s+)?liver)|(?:primarily|mainly)\s+(?:hepatic|liver)\s+metaboli[sz])/i;
       let changed = false;
       const remaining = next.split(/;\s*/).filter(clause => {
         if (!bad.test(clause)) return true;
