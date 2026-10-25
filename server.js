@@ -578,10 +578,42 @@ retrievedStudies = studies;
   // Stage 2: independent metadata retrieval, disabled by default.
   // Registry records are not evidence of efficacy; Europe PMC records may
   // overlap with PubMed. Neither can authorize new PubMed PMIDs.
+  // Keep an independent, bounded index of retrieved metadata for the final report.
+  // Search-term matches are discovery hints, not proof a compound was administered.
+  let expandedEvidenceIndex = '';
   let expandedResearchContext = '';
   if (ENABLE_EXPANDED_RESEARCH && shouldSearchPubMed) {
     try {
       const expanded = await retrieveResearchSources(pubmedSearchQuestion, { limit: 3 });
+      const safeEvidenceText = (value, limit = 200) =>
+        String(value ?? '').replace(/[\r\n|<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, limit);
+      const indexLines = [
+        '## Retrieved evidence index (discovery records)',
+        '',
+        'These are search results retrieved for this request, not verified evidence of benefit. A matching search term does not establish that a compound was administered or studied. Registry status and posted-results indicators do not verify clinical outcomes.',
+        '',
+        '### ClinicalTrials.gov registrations',
+        ...(expanded.trials.length ? expanded.trials.map(t =>
+          '- [' + safeEvidenceText(t.id, 24) + '](' + t.url + ') — ' +
+          safeEvidenceText(t.title, 160) +
+          '; search: ' + safeEvidenceText(t.matchedSearchTerm, 40) +
+          '; status: ' + safeEvidenceText(t.status, 60) +
+          '; results posted: ' + (t.resultsPosted ? 'yes (outcomes not independently assessed)' : 'no') +
+          '.'
+        ) : ['- No registry records returned.']),
+        '',
+        '### Europe PMC publications',
+        ...(expanded.literature.length ? expanded.literature.map(p =>
+          '- [' + safeEvidenceText(p.id, 24) + '](' + p.url + ') — ' +
+          safeEvidenceText(p.title, 160) +
+          '; search: ' + safeEvidenceText(p.matchedSearchTerm, 40) +
+          '; year: ' + safeEvidenceText(p.publicationYear, 8) +
+          '. Publication metadata only; compound, population and outcomes not verified.'
+        ) : ['- No publication metadata returned.']),
+        '',
+        'Registry entries are not clinical results. Europe PMC records may overlap PubMed. Only citations independently verified through the PubMed retrieval pipeline should be used to support specific clinical claims.'
+      ];
+      expandedEvidenceIndex = indexLines.join('\n');
       const trialLines = expanded.trials.map(t =>
         `TRIAL ${t.id} | ${t.title} | ${t.url} | status=${t.status} | postedResults=${t.resultsPosted} | note=${t.evidenceNote}`);
       const literatureLines = expanded.literature.map(p =>
@@ -808,7 +840,10 @@ const finalWithSources = appendOfficialRegulatorySources(
   filterCompoundBibliography(formattedReply, retrievedStudies),
   isCompletedResearchReport
 );
-return send(res, 200, { reply: finalWithSources }, extra);
+const attributedReply = isCompletedResearchReport && expandedEvidenceIndex
+  ? finalWithSources + '\n\n---\n\n' + expandedEvidenceIndex
+  : finalWithSources;
+return send(res, 200, { reply: attributedReply }, extra);
 
   } catch (err) {
     const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
