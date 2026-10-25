@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {guardContentQuality, auditCitationMetadata, appendRetrievedPubMedReferences} from './content-quality.js';
+import {guardContentQuality, auditCitationMetadata, appendRetrievedPubMedReferences, removeModelPubMedBibliography} from './content-quality.js';
 
 test('research-only is not FDA approval', () => {
  const {reply}=guardContentQuality('MK-677 | approved for research only | S2.2.4\nNot FDA-approved for muscle repair or any indication outside research.');
@@ -48,4 +48,32 @@ test('appends source-owned PubMed bibliography without pretending to verify outc
  assert.match(out,/does not verify the exact population/);
  assert.equal(appendRetrievedPubMedReferences(out,studies,true),out);
  assert.equal(appendRetrievedPubMedReferences('Intro',studies,false),'Intro');
+});
+
+test('removes model PubMed bibliography while keeping trial citations and later conclusion',()=>{
+ const report='## Executive Summary\nMK-677 trial [PMID: 21067829](https://pubmed.ncbi.nlm.nih.gov/21067829/).\n## References (Clickable PubMed Links)\nBPC-157 Reviews and Evidence:\nPMID: 40005999,\nMK-677 Clinical Trials:\nPMID: 41966639\n## Conclusion\nHuman exercise repair unproven.\n## Official Regulatory References\nWADA list';
+ const out=removeModelPubMedBibliography(report);
+ assert.match(out,/PMID: 21067829/);
+ assert.doesNotMatch(out,/PMID: 41966639|PMID: 40005999/);
+ assert.match(out,/Human exercise repair unproven/);
+ assert.match(out,/WADA list/);
+});
+test('strips terminal bibliography and preserves reports without reference lists',()=>{
+ const input='## Introduction\nScientific narrative.\n## Research References\n- PMID: 40005999';
+ assert.equal(removeModelPubMedBibliography(input),'## Introduction\nScientific narrative.');
+ assert.equal(removeModelPubMedBibliography('An answer with [PMID: 21067829](https://pubmed.ncbi.nlm.nih.gov/21067829/) inline.'),
+ 'An answer with [PMID: 21067829](https://pubmed.ncbi.nlm.nih.gov/21067829/) inline.');
+});
+test('single backend bibliography wins over mismatched model references',()=>{
+ const studies=[{pmid:'21067829',title:'Ibutamoren hip fracture RCT',publicationTypes:['Randomized Controlled Trial'],matchedCompounds:['MK-677']},
+ {pmid:'40789979',title:'BPC-157 narrative review',publicationTypes:['Review'],matchedCompounds:['BPC-157']}];
+ const model='Research report\n## References (Clickable PubMed Links)\nMK-677:\nPMID: 40789979\n## Conclusion\nTrial outcomes were mixed.';
+ const clean=removeModelPubMedBibliography(model);
+ const out=appendRetrievedPubMedReferences(clean,studies,true);
+ assert.equal((out.match(/Retrieved PubMed references \(bibliographic records\)/g)||[]).length,1);
+ assert.doesNotMatch(out,/MK-677:\nPMID: 40789979/);
+ assert.match(out,/PMID: 21067829/);
+ assert.match(out,/PMID: 40789979/);
+ assert.match(out,/compounds mentioned: BPC-157/);
+ assert.match(out,/Trial outcomes were mixed/);
 });
