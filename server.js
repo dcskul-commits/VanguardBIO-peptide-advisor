@@ -25,6 +25,15 @@ const WINDOW_MS = 60_000;
 const MAX_TRACKED_KEYS = 5000;
 const MAX_CONCURRENT = 8;
 const MAX_PUBMED_RESULTS = 8;
+const boundedTimeoutMs = (name, fallback) => {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value >= 5_000 && value <= 90_000 ? value : fallback;
+};
+// Keep defaults within the existing 40s Node request timeout and verify any
+// larger value against the Airo frontend and Render proxy before enabling it.
+const CHAT_OPENAI_TIMEOUT_MS = boundedTimeoutMs('CHAT_OPENAI_TIMEOUT_MS', 25_000);
+const REPORT_OPENAI_TIMEOUT_MS = boundedTimeoutMs('REPORT_OPENAI_TIMEOUT_MS', 30_000);
+
 // OFF by default: no new network calls or prompt changes unless explicitly enabled.
 const ENABLE_EXPANDED_RESEARCH = process.env.ENABLE_EXPANDED_RESEARCH === 'true';
 const hits = new Map();
@@ -552,6 +561,11 @@ const pubmedSearchQuestion =
     ? `${conversationCompounds.join(', ')} human clinical evidence safety muscle recovery`
     : latestQuestion;
 
+const reportMode = justAnsweredQuestionSix || isFinalResearchRequest;
+const openaiTimeoutMs = reportMode ? REPORT_OPENAI_TIMEOUT_MS : CHAT_OPENAI_TIMEOUT_MS;
+let aiStage = 'research_retrieval';
+const researchStart = performance.now();
+
   let researchContext = '';
 let pubmedStatus = 'not_requested';
 let retrievedStudies = [];
@@ -740,6 +754,9 @@ SOURCE RULES:
       expandedResearchContext + '\nRules: Trial registration is not evidence of benefit. Do not invent trial results or citations. Europe PMC metadata may overlap with PubMed. Cite a PubMed PMID only if separately supplied in verified PubMed research data. Treat these as discovery links and distinguish them from evidence supporting clinical claims.'
   }] : [];
 
+  console.info('AI_REQUEST_STAGE', JSON.stringify({stage:'research_complete', durationMs:Math.round(performance.now()-researchStart), reportMode, pubmedStatus}));
+  aiStage = 'initial_generation';
+  const openaiStart = performance.now();
   const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
@@ -792,8 +809,9 @@ treatment, dosing, or sourcing recommendations.
   temperature: 0.2,
   max_tokens: 3500
 }),
-      signal: AbortSignal.timeout(30_000)
+      signal: AbortSignal.timeout(openaiTimeoutMs)
     });
+    console.info('AI_REQUEST_STAGE', JSON.stringify({stage:'initial_generation', durationMs:Math.round(performance.now()-openaiStart), reportMode, status:upstream.status, timeoutMs:openaiTimeoutMs}));
     if (!upstream.ok) {
       console.error('OPENAI_UPSTREAM_FAILURE', JSON.stringify({ status: upstream.status }));
       const status = upstream.status === 429 ? 503 : 502;
@@ -827,6 +845,8 @@ if (justAnsweredQuestionSix && (
   finalReply.trim().length < 650
 )) {
   console.warn('INCOMPLETE_INTAKE_REPORT: retrying once');
+  aiStage = 'report_retry';
+  const retryStart = performance.now();
   const retry = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
@@ -845,8 +865,9 @@ if (justAnsweredQuestionSix && (
       temperature: 0.2,
       max_tokens: 3500
     }),
-    signal: AbortSignal.timeout(30_000)
+    signal: AbortSignal.timeout(openaiTimeoutMs)
   });
+  console.info('AI_REQUEST_STAGE', JSON.stringify({stage:'report_retry', durationMs:Math.round(performance.now()-retryStart), status:retry.status, timeoutMs:openaiTimeoutMs}));
   if (!retry.ok) return send(res, 502, { error: 'The final report could not be completed. Please retry.' }, extra);
   const retryResult = await retry.json();
   if (retryResult?.choices?.[0]?.finish_reason === 'length')
@@ -932,10 +953,12 @@ return send(res, 200, { reply: attributedReply }, extra);
 
   } catch (err) {
     const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
-    console.error('AI request failed:', timedOut ? 'timeout' : 'network_or_parse_error');
+    console.error('AI_REQUEST_FAILURE', JSON.stringify({stage:aiStage, reason:timedOut?'timeout':'network_or_parse_error', reportMode, timeoutMs:openaiTimeoutMs, elapsedMs:Math.round(performance.now()-researchStart)}));
     return send(res, timedOut ? 504 : 502, { error: timedOut ? 'The AI response timed out. Please retry.' : 'Unable to answer right now. Please retry.' }, extra);
   } finally { active--; }
 });
+// Node's requestTimeout covers receipt of the inbound request; it does not
+// override Airo's fetch timeout, Render's proxy, or the OpenAI AbortSignal.
 server.requestTimeout = 40_000;
 server.headersTimeout = 15_000;
 server.listen(PORT, '0.0.0.0', () => console.log(`VanguardBio-You API listening on ${PORT}`));
