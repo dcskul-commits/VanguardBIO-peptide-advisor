@@ -957,8 +957,8 @@ return send(res, 200, { reply: attributedReply }, extra);
     return send(res, timedOut ? 504 : 502, { error: timedOut ? 'The AI response timed out. Please retry.' : 'Unable to answer right now. Please retry.' }, extra);
   } finally { active--; }
 });
-// HTTP request timeout must exceed configured OpenAI timeout and retrieval cost.
-// Airo/browser and Render proxy timeouts can be shorter: verify before raising env vars.
-server.requestTimeout = Math.max(40_000, REPORT_OPENAI_TIMEOUT_MS + 25_000, CHAT_OPENAI_TIMEOUT_MS + 10_000);
+// Node's requestTimeout covers receipt of the inbound request; it does not
+// override Airo's fetch timeout, Render's proxy, or the OpenAI AbortSignal.
+server.requestTimeout = 40_000;
 server.headersTimeout = 15_000;
 server.listen(PORT, '0.0.0.0', () => console.log(`VanguardBio-You API listening on ${PORT}`));
