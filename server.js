@@ -9,6 +9,7 @@ import {
 } from './pubmed.js';
 import { retrieveResearchSources } from './research-sources.js';
 import { guardContentQuality, auditCitationMetadata, appendRetrievedPubMedReferences, removeModelPubMedBibliography } from './content-quality.js';
+import { assessIntakeReport } from './report-completion.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
@@ -836,15 +837,15 @@ if (finishReason === 'length') {
   }, extra);
 }
 
-// A transition is not a report. Retry once with a targeted correction before
-// returning a successful response that could enable the frontend PDF button.
+// Reject truly incomplete Q6 responses, but do not reject a substantive report
+// merely because its body quotes transition language. Log reasons, never text.
 let finalReply = reply;
-if (justAnsweredQuestionSix && (
-  /\b(?:I will|I'll|let me|going to)\s+(?:now\s+)?(?:prepare|generate|compile|create|put together)\b/i.test(finalReply) ||
-  /\b(?:I have all (?:the )?information|I will prepare the report now|report (?:will be|is being) prepared|please hold on|hold on for the (?:full )?report)\b/i.test(finalReply) ||
-  finalReply.trim().length < 650
-)) {
-  console.warn('INCOMPLETE_INTAKE_REPORT: retrying once');
+const initialCompletion = justAnsweredQuestionSix ? assessIntakeReport(finalReply) : null;
+if (initialCompletion && !initialCompletion.complete) {
+  console.warn('INCOMPLETE_INTAKE_REPORT', JSON.stringify({
+    action: 'retry', reason: initialCompletion.reason, length: initialCompletion.length,
+    finishReason: finishReason || 'unknown'
+  }));
   aiStage = 'report_retry';
   const retryStart = performance.now();
   const retry = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -874,11 +875,14 @@ if (justAnsweredQuestionSix && (
     return send(res, 502, { error: 'The final report exceeded the response limit. Please retry.' }, extra);
   finalReply = retryResult?.choices?.[0]?.message?.content || '';
 }
-if (justAnsweredQuestionSix && (finalReply.trim().length < 650 ||
-  /\b(?:I will|I'll|let me|going to)\s+(?:now\s+)?(?:prepare|generate|compile|create|put together)\b/i.test(finalReply) ||
-  /\bplease hold on\b/i.test(finalReply))) {
-  console.warn('INCOMPLETE_INTAKE_REPORT: refusing transition as completed report');
-  return send(res, 502, { error: 'The research report was not completed. Please retry.' }, extra);
+if (justAnsweredQuestionSix) {
+  const completion = assessIntakeReport(finalReply);
+  if (!completion.complete) {
+    console.warn('INCOMPLETE_INTAKE_REPORT', JSON.stringify({
+      action: 'reject', reason: completion.reason, length: completion.length
+    }));
+    return send(res, 502, { error: 'The research report was not completed. Please retry.' }, extra);
+  }
 }
 
 const lastAssistantMessage = [...messages]
