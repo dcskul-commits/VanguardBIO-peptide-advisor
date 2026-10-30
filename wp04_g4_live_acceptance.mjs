@@ -9,7 +9,7 @@ async function fetchStaging(options) {
   let latest;
   for (let attempt=0; attempt<3; attempt++) {
     try {
-      latest=await fetchStaging(options);
+      latest=await fetch(endpoint,options);
       const mime=latest.headers.get('content-type')||'';
       if (latest.ok && /application\/json/i.test(mime)) return latest;
       if (latest.status<500 && /application\/json/i.test(mime)) return latest;
