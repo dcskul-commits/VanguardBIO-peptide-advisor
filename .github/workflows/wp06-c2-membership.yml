@@ -22,3 +22,12 @@ jobs:
       - run: npm test
       - name: Assert Better Auth package integration is importable
         run: node --input-type=module -e "import('better-auth/node').then(m=>{if(typeof m.toNodeHandler!=='function')process.exit(1)})"
+  staging-closed-smoke:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node wp06_staging_closed_smoke.mjs
