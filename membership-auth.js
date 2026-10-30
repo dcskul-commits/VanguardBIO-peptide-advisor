@@ -13,7 +13,9 @@ export function createMembershipHandler(env=process.env) {
     max:4,
     connectionTimeoutMillis:4000,
     idleTimeoutMillis:10000,
-    ssl: { rejectUnauthorized: true }
+    // Same-region Render private networking; self-signed internal TLS is not CA-verifiable.
+    // Do not use a publicly reachable database host; config enforces exact staging host.
+    ssl: false
   });
   const auth=betterAuth({
     baseURL:cfg.authURL,
