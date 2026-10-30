@@ -5,7 +5,7 @@ const preview='https://g2uectlusc.preview.c37.airoapp.ai';
 const valid={
   MEMBERSHIP_ENABLED:'true', MEMBERSHIP_ENV:'staging', MEMBERSHIP_DATABASE_ROLE:'staging',
   BETTER_AUTH_URL:'https://vanguardbio-peptide-advisor-staging.onrender.com',
-  DATABASE_URL:'postgres://user:password@staging-db.example.net/staging',
+  DATABASE_URL:'postgres://user:password@dpg-dbihntl9fdbs73dmumrg-a/vanguardbio_membership_staging',
   BETTER_AUTH_SECRET:'x'.repeat(48),
   MEMBERSHIP_PREVIEW_ORIGIN:preview, RESEND_API_KEY:'test',MEMBERSHIP_EMAIL_FROM:'test@example.org'
 };
@@ -25,3 +25,6 @@ test('missing email delivery denied',()=>{assert.throws(()=>validateMembershipCo
 test('weak secret denied',()=>{assert.throws(()=>validateMembershipConfig({...valid,BETTER_AUTH_SECRET:'short'}))});
 test('preview wildcard not allowed',()=>{assert.throws(()=>validateMembershipConfig({...valid,MEMBERSHIP_PREVIEW_ORIGIN:'https://*.airoapp.ai'}))});
 test('same origin production not allowed',()=>{assert.throws(()=>validateMembershipConfig({...valid,MEMBERSHIP_PREVIEW_ORIGIN:'https://you.vanguardbio.ai'}))});
+
+test('production or unknown database hostname denied',()=>{assert.throws(()=>validateMembershipConfig({...valid,DATABASE_URL:'postgres://x:x@production-db.example/staging'}))});
+test('external database host denied',()=>{assert.throws(()=>validateMembershipConfig({...valid,DATABASE_URL:'postgres://x:x@dpg-dbihntl9fdbs73dmumrg-a.oregon-postgres.render.com/staging'}))});
