@@ -471,7 +471,7 @@ const membershipHandler = process.env.MEMBERSHIP_ENABLED === 'true'
 
 const server = http.createServer(async (req, res) => {
   const pathname = new URL(req.url || '/', 'http://localhost').pathname;
-  if (pathname.startsWith('/api/auth/')) {
+  if (pathname.startsWith('/api/auth/') || pathname === '/api/membership/me') {
     if (!membershipHandler) return send(res, 404, {error:'Not found.'});
     return membershipHandler.handle(req,res);
   }
