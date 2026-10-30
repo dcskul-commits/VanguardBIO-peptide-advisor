@@ -8,7 +8,7 @@ const equipment = /\b(?:insulin syringe|needle (?:size|gauge)|syringe (?:size|ga
 const processCue = /\b(?:then|until|afterwards?|first|next|to prepare|to reconstitute|against the inside|inside wall|into the|with bacteriostatic|with water|gently|slowly|down the side)\b/i;
 const imperative = /^(?:(?:first|next|then)\s*,?\s*)?(?:using|use|inject\w*|add|draw|mix|swirl|dissolv\w*|fill|choose|select|place|rotate|transfer|combine|pour|reconstitute|prepare)\b/i;
 const direction = /\b(?:use a|should use|commonly used|choose|select|process involves|step.by.step|the steps are|follow these steps|can use)\b/i;
-const evidence = /\b(?:study|studies|trial|trials|publication|pubmed|PMID|clinical|animals?|rodents?|research|evidence|methods?|protocols?|literature|historical|investigational|regulatory|safety|risk|contamination|sterility|uncertain|unknown|not established|insufficient|lack of|unapproved)\b/i;
+const evidence = /\b(?:study|studies|pilot|paper|trial|trials|publication|pubmed|PMID|clinical|animals?|rodents?|research|evidence|methods?|protocols?|literature|historical|investigational|regulatory|safety|risk|contamination|sterility|uncertain|unknown|not established|insufficient|lack of|unapproved)\b/i;
 const negation = /\b(?:do not|don't|never|avoid|cannot|can't|should not|not recommended|not validated|no established|not provide|does not recommend|shouldn't|must not)\b/i;
 const studyMethod = /\b(?:administered|was given|were given|used in (?:a |the )?(?:study|trial|animal)|reported|investigated|evaluated|assessed|described|injected|injection(?:s)? (?:were|was)|performed|conducted)\b/i;
 // "Into the bladder wall" is anatomical, not a preparation sequence.
