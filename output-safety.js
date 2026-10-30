@@ -10,7 +10,11 @@ const imperative = /^(?:(?:first|next|then)\s*,?\s*)?(?:using|use|inject\w*|add|
 const direction = /\b(?:use a|should use|commonly used|choose|select|process involves|step.by.step|the steps are|follow these steps|can use)\b/i;
 const evidence = /\b(?:study|studies|trial|trials|publication|pubmed|PMID|clinical|animals?|rodents?|research|evidence|methods?|protocols?|literature|historical|investigational|regulatory|safety|risk|contamination|sterility|uncertain|unknown|not established|insufficient|lack of|unapproved)\b/i;
 const negation = /\b(?:do not|don't|never|avoid|cannot|can't|should not|not recommended|not validated|no established|not provide|does not recommend|shouldn't|must not)\b/i;
-const studyMethod = /\b(?:administered|was given|were given|used in (?:a |the )?(?:study|trial|animal)|reported|investigated|evaluated|assessed)\b/i;
+const studyMethod = /\b(?:administered|was given|were given|used in (?:a |the )?(?:study|trial|animal)|reported|investigated|evaluated|assessed|described|injected|injection(?:s)? (?:were|was)|performed|conducted)\b/i;
+// "Into the bladder wall" is anatomical, not a preparation sequence.
+// Actual handling sequences cannot acquire an exception from study citations.
+const operationalSequence = /\b(?:then|until|afterwards?|first|next|to prepare|to reconstitute|against the inside|inside wall|with bacteriostatic|with water|gently|slowly|down the side)\b/i;
+const studyAttribution = /\b(?:study|studies|trial|trials|pilot|publication|paper|article|authors?|methods?|patients?|participants?|subjects?|during cystoscopy|intravesical|clinical|animal|research|PMID)\b/i;
 
 export const SAFE_REPLY = 'I can explain published evidence and safety uncertainties about experimental peptides, but cannot provide reconstitution steps, injection preparation, syringe or needle specifications, mixing volumes, or individualized administration guidance. Consult a licensed healthcare professional or pharmacist for medical decisions.';
 
@@ -31,7 +35,11 @@ function assessUnit(raw) {
   // Avoid suppressing an explicit later instruction because an earlier
   // negative warning happens elsewhere in the report.
   if(negative && !hasSequence) return null;
-  if(academic && studyMethod.test(s) && !directs && !hasSequence) return null;
+  // Source-attributed, past-tense methods descriptions are educational.
+  // The exception is clause-local and never covers directives, equipment
+  // recommendations, or operational handling sequences.
+  if(academic && studyAttribution.test(s) && studyMethod.test(s) &&
+      !directs && !operationalSequence.test(s)) return null;
   if(hasEquipment && (directs || (hasSequence && hasAction))) return 'equipment';
   if(hasAction && ((directs && !negative) || (hasSequence && (!academic || directs)))) return 'procedure';
   return null;
