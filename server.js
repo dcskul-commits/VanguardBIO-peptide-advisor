@@ -11,6 +11,7 @@ import { retrieveResearchSources } from './research-sources.js';
 import { guardContentQuality, auditCitationMetadata, appendRetrievedPubMedReferences, removeModelPubMedBibliography, refineReviewedEvidenceClaims } from './content-quality.js';
 import { assessIntakeReport } from './report-completion.js';
 import { guardOutputSafety } from './output-safety.js';
+import { evaluateResearchRecovery } from './research-recovery.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
@@ -998,13 +999,18 @@ if (safetyChecked.replaced && !reportMode && researchIntent && requestedVerified
       const candidate=String(payload?.choices?.[0]?.message?.content||'').trim();
       const citationResult=validatePubMedCitations(candidate,retrievedStudies,true);
       const checked=guardOutputSafety(candidate,conversationText);
-      if (candidate.length>100 && citationResult.valid &&
-          requestedVerified.some(s => new RegExp('\\b'+String(s.pmid)+'\\b').test(candidate)) &&
-          !checked.replaced && payload?.choices?.[0]?.finish_reason!=='length') {
+      const decision=evaluateResearchRecovery({
+        candidate,
+        finishReason:payload?.choices?.[0]?.finish_reason,
+        citationValid:citationResult.valid,
+        requestedPmids:requestedVerified.map(study=>String(study.pmid)),
+        safetyResult:checked
+      });
+      if (decision.accepted) {
         safetyChecked=checked;
         console.info('RESEARCH_SAFETY_RECOVERY', JSON.stringify({status:'accepted',durationMs:Math.round(performance.now()-rescueStart)}));
       } else {
-        console.warn('RESEARCH_SAFETY_RECOVERY', JSON.stringify({status:'rejected',reason:checked.replaced?'output_guard':'citation_or_incomplete'}));
+        console.warn('RESEARCH_SAFETY_RECOVERY', JSON.stringify({status:'rejected',reason:decision.reason}));
       }
     } else {
       console.warn('RESEARCH_SAFETY_RECOVERY', JSON.stringify({status:'rejected',reason:'upstream_status'}));
