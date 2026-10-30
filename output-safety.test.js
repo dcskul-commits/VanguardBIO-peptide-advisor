@@ -53,3 +53,35 @@ test('G3.1: do-not-use cautions without instructions are preserved', () => {
  const r='For BPC-157, do not inject unapproved research products; sterility and composition are uncertain.';
  assert.equal(guardOutputSafety(r,q).reply,r);
 });
+
+test('G3.2: full research report with PubMed navigation bullets remains intact', () => {
+ const report = [
+  '## Educational Research Summary',
+  '## Executive Summary',
+  'BPC-157 has insufficient controlled human studies on muscle recovery.',
+  '- Use PubMed to verify trial characteristics and clinical outcomes.',
+  '- Choose studies by population and design rather than anecdotes.',
+  '## Safety Considerations',
+  'Reconstitution and mixing procedures are not validated for human use.',
+  'The study reported dosing and administration methods in an animal model; no human protocol follows.',
+  '## Retrieved PubMed references (bibliographic records)',
+  '- [PMID: 12345678](https://pubmed.ncbi.nlm.nih.gov/12345678/)'
+ ].join('\n');
+ assert.equal(guardOutputSafety(report,q).reply,report);
+});
+test('G3.2: unrelated use and preparation vocabulary across sections do not combine', () => {
+ const report='## Educational Research Summary\nUse primary research sources for BPC-157.\n## Risks\nExperimental peptides can have mixing and sterility risks. The correct syringe size is unknown.';
+ assert.equal(guardOutputSafety(report,q).reply,report);
+});
+test('G3.2: direct list instructions remain blocked in a complete report', () => {
+ const report='## Educational Research Summary\nBPC-157 human evidence is limited.\n## Safety\n- Use a syringe to add water to the vial.\n## Conclusion\nConsult a clinician.';
+ assert.equal(guardOutputSafety(report,q).replaced,true);
+});
+test('G3.2: refusal does not exempt a subsequent procedural sentence in a report', () => {
+ const report='## Educational Research Summary\nI cannot advise on preparation. Add water to the vial and gently swirl until dissolved.';
+ assert.equal(guardOutputSafety(report,q).replaced,true);
+});
+test('G3.2: methodological descriptions and negative cautions preserved', () => {
+ const report='## Educational Research Summary\nThe animal study used injections as part of its protocol; human efficacy cannot be inferred.\nDo not mix or inject unapproved BPC-157 products.';
+ assert.equal(guardOutputSafety(report,q).reply,report);
+});
