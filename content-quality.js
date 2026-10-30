@@ -151,8 +151,10 @@ export function refineReviewedEvidenceClaims(reply) {
         corrections.push('bpc_pilot_instillation_precision');
       } else if (/\bintravesical injection(?:s)?\b/i.test(updated) &&
           !/\b(?:cystoscop\w*|bladder wall|bladder inflammation|area of inflammation)\b/i.test(updated)) {
-        updated = updated.replace(/\bintravesical injection(?:s)?\b/gi,
-          'intravesical injections during cystoscopy');
+        updated = updated.replace(/\bafter intravesical injection(?:s)? of BPC[\s-]?157\b/gi,
+          'following BPC-157 intravesical injections during cystoscopy')
+          .replace(/\bintravesical injection(?:s)?\b/gi,
+            'intravesical injections during cystoscopy');
         corrections.push('bpc_pilot_route_context');
       }
     }
