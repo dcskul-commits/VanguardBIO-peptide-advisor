@@ -1,0 +1,24 @@
+name: WP06-C2 membership CI (code-only, no database)
+on:
+  push:
+    branches:
+      - wp06-c2-membership-staging-foundation
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: node --check server.js
+      - run: node --check membership-auth.js
+      - run: node --check membership-config.js
+      - run: node --check membership-email.js
+      - run: npm test
+      - name: Assert Better Auth package integration is importable
+        run: node --input-type=module -e "import('better-auth/node').then(m=>{if(typeof m.toNodeHandler!=='function')process.exit(1)})"
