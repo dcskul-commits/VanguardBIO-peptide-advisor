@@ -82,7 +82,7 @@ test('single backend bibliography wins over mismatched model references',()=>{
 test('WP04-G4: source-authored intravesical injection is retained and contextualized',()=>{
  const input='- One small pilot in 12 women with interstitial cystitis reported symptom resolution after intravesical injection of BPC-157 [PMID: 39325560](https://pubmed.ncbi.nlm.nih.gov/39325560/).';
  const out=refineReviewedEvidenceClaims(input);
- assert.match(out.reply,/intravesical injections during cystoscopy of BPC-157/);
+ assert.match(out.reply,/following BPC-157 intravesical injections during cystoscopy/);
  assert.match(out.reply,/PMID: 39325560/);
  assert.deepEqual(out.corrections,['bpc_pilot_route_context']);
 });
