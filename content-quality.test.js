@@ -82,7 +82,7 @@ test('single backend bibliography wins over mismatched model references',()=>{
 test('WP04-G4: BPC pilot citation does not misdescribe the injection as intravesical',()=>{
  const input='- One small pilot in 12 women with interstitial cystitis reported symptom resolution after intravesical injection of BPC-157 [PMID: 39325560](https://pubmed.ncbi.nlm.nih.gov/39325560/).';
  const out=refineReviewedEvidenceClaims(input);
- assert.match(out.reply,/injections during cystoscopy in a bladder-condition pilot/);
+ assert.match(out.reply,/following BPC-157 injections during cystoscopy/);
  assert.doesNotMatch(out.reply,/intravesical injection/);
  assert.match(out.reply,/PMID: 39325560/);
  assert.deepEqual(out.corrections,['bpc_pilot_route_precision']);
@@ -91,7 +91,7 @@ test('WP04-G4: BPC review preclinical effects cannot become established human ef
  const input='- A systematic review found mostly preclinical studies (animal and in vitro) showing BPC-157 promotes healing in muscle, tendon and bone injuries [PMID: 40756949](https://pubmed.ncbi.nlm.nih.gov/40756949/).';
  const out=refineReviewedEvidenceClaims(input);
  assert.doesNotMatch(out.reply,/promotes healing/i);
- assert.match(out.reply,/possible effects on tissue repair in preclinical research/i);
+ assert.match(out.reply,/may affect tissue repair in preclinical models/i);
  assert.match(out.reply,/do not establish effectiveness or safety in humans/i);
  assert.match(out.reply,/PMID: 40756949/);
 });
