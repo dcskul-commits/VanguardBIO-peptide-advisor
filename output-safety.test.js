@@ -111,3 +111,16 @@ test('WP04-G4.1: a complete cited report containing study methods is not replace
  const r='## Educational Research Summary\nBPC-157 was investigated in an uncontrolled 12-patient bladder pilot. In the study, injections were administered into the bladder wall during cystoscopy; there was no muscle-repair endpoint.\n[PMID: 39325560](https://pubmed.ncbi.nlm.nih.gov/39325560/)\n## Safety\nThe route described is a clinical method, not a recommendation.';
  assert.equal(guardOutputSafety(r,q).reply,r);
 });
+
+test('WP04-G4.1: historical study phrasing cannot authorize handling liquids into a vial',()=>{
+ const r='A published BPC-157 study reported that water was injected into the vial during preparation.';
+ assert.equal(guardOutputSafety(r,q).replaced,true);
+});
+test('WP04-G4.1: purported clinical methods cannot excuse sequential vial handling',()=>{
+ const r='The published BPC-157 study described adding a solution into the vial, then mixing it gently.';
+ assert.equal(guardOutputSafety(r,q).replaced,true);
+});
+test('WP04-G4.1: clinical route and anatomical descriptions remain non-actionable',()=>{
+ const r='The BPC-157 pilot study reported injections into the bladder wall during cystoscopy, not a validated muscle recovery treatment.';
+ assert.equal(guardOutputSafety(r,q).reply,r);
+});
