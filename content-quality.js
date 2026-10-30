@@ -126,3 +126,43 @@ export function appendRetrievedPubMedReferences(reply, studies, completedReport)
     'These links are PubMed records retrieved for this request. Inclusion does not verify the exact population, intervention, endpoint or claim in this report; verify each abstract and study before citing an outcome.\n\n' +
     entries.join('\n');
 }
+
+
+// WP04-G4: Narrow, reviewed citation-to-claim corrections for three known
+// abstracts. These are NOT generic validation of citations or clinical claims.
+// Require the exact PMID and qualifying assertion on the same line; leave
+// unrelated studies, tables and source-owned bibliography untouched.
+export function refineReviewedEvidenceClaims(reply) {
+  if (typeof reply !== 'string') return {reply, corrections: []};
+  const corrections = [];
+  const revised = reply.split('\n').map(line => {
+    if (/^\s*[-*]\s*\[PMID:|^\s*#{1,6}\s*Retrieved PubMed references/i.test(line)) return line;
+    let updated = line;
+    if (/\b39325560\b/.test(line) && /\b(?:interstitial cystitis|bladder)\b/i.test(line) &&
+        /\b(?:intravesical injection|bladder instillation)\b/i.test(line)) {
+      updated = updated.replace(/\bintravesical injection(?:s)?\b|\bbladder instillation(?:s)?\b/gi,
+        'injections during cystoscopy in a bladder-condition pilot');
+      corrections.push('bpc_pilot_route_precision');
+    }
+    if (/\b40756949\b/.test(line) && /\bBPC[\s-]?157\b/i.test(line) &&
+        /\b(?:preclinical|animal|in vitro|systematic review)\b/i.test(line) &&
+        /\b(?:promotes?|accelerates?|demonstrates?)\s+(?:\w+\s+){0,3}(?:healing|repair)\b/i.test(line)) {
+      updated = updated.replace(/\b(?:promotes?|accelerates?|demonstrates?)\s+(?:\w+\s+){0,3}(?:healing|repair)\b/gi,
+        'showed possible effects on tissue repair in preclinical research');
+      if (!/\b(?:not establish|does not establish|not proven|not demonstrated)\b[^.\n]*\bhumans?\b/i.test(updated)) {
+        updated = updated.replace(/(\s*\[PMID:\s*40756949\]\(https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/40756949\/?\))/i,
+          ' These findings do not establish effectiveness or safety in humans.$1');
+      }
+      corrections.push('bpc_preclinical_efficacy_precision');
+    }
+    if (/\b21067829\b/.test(line) && /\b(?:MK[\s-]?677|ibutamoren)\b/i.test(line) &&
+        /\b(?:hip fracture|phase IIb)\b/i.test(line) &&
+        /\b(?:functional improvements? in muscle strength or recovery|improvements? in muscle strength or recovery)\b/i.test(line)) {
+      updated = updated.replace(/\b(?:functional improvements? in muscle strength or recovery|improvements? in muscle strength or recovery)\b/gi,
+        'improvement in most functional performance measures');
+      corrections.push('mk677_functional_endpoint_precision');
+    }
+    return updated;
+  });
+  return {reply:revised.join('\n'),corrections:[...new Set(corrections)]};
+}
