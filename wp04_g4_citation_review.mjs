@@ -32,6 +32,29 @@ for (let step = 0; step < prompts.length; step++) {
   messages.push({role:'assistant',content:payload.reply});
 }
 const report = messages.at(-1).content;
+const fallbackDetected = /^I can explain published evidence and safety uncertainties about experimental peptides, but cannot provide reconstitution steps/i.test(report.trim());
+const hasReportHeading = /educational research summary/i.test(report);
+if (fallbackDetected || !hasReportHeading) {
+  const privateDir = path.join(os.homedir(), '.wp04-g4-private');
+  await mkdir(privateDir, {recursive:true, mode:0o700});
+  const file = path.join(privateDir, 'citation-blocked-'+randomUUID()+'.json');
+  await writeFile(file, JSON.stringify({
+    note:'Private staging report diagnostic, do not commit.',
+    reason:fallbackDetected ? 'OUTPUT_SAFETY_FALLBACK' : 'MISSING_REPORT_HEADING',
+    stages,
+    reportCharacters:report.length,
+    report
+  }, null, 2), {mode:0o600,flag:'wx'});
+  console.log(JSON.stringify({
+    status:'CITATION_REVIEW_BLOCKED',
+    reason:fallbackDetected?'OUTPUT_SAFETY_FALLBACK':'MISSING_REPORT_HEADING',
+    stagingStages:stages.length,
+    finalCharacters:report.length,
+    localPrivateFile:file,
+    note:'Do not score a replaced or missing report as zero citations. Requires output safety guard review.'
+  },null,2));
+  process.exit(2);
+}
 const extractIds = text => [...new Set([...text.matchAll(/\bPMID\s*:?\s*\[?(\d{5,9})\]?|pubmed\.ncbi\.nlm\.nih\.gov\/(\d{5,9})/gi)].map(m=>m[1]||m[2]))];
 const ids = extractIds(report);
 const decode = text => String(text ?? '').replace(/&#x([0-9a-f]+);/gi, (_,num)=>String.fromCodePoint(parseInt(num,16)))
