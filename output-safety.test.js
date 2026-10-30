@@ -85,3 +85,29 @@ test('G3.2: methodological descriptions and negative cautions preserved', () => 
  const report='## Educational Research Summary\nThe animal study used injections as part of its protocol; human efficacy cannot be inferred.\nDo not mix or inject unapproved BPC-157 products.';
  assert.equal(guardOutputSafety(report,q).reply,report);
 });
+
+
+test('WP04-G4.1: source-attributed clinical route description is preserved', () => {
+ const r='In the published BPC-157 pilot study (PMID 39325560), injections were administered into the bladder wall during cystoscopy; the study involved 12 patients and did not assess muscle recovery.';
+ assert.equal(guardOutputSafety(r,q).reply,r);
+});
+test('WP04-G4.1: historical research instrument mentioned without advice is preserved', () => {
+ const r='The BPC-157 pilot paper described an injection with a syringe into the area of inflammation during cystoscopy. This uncontrolled study is not a muscle-recovery trial.';
+ assert.equal(guardOutputSafety(r,q).reply,r);
+});
+test('WP04-G4.1: citation does not exempt a preparation sequence', () => {
+ const r='The BPC-157 study described a procedure. First, add water to a vial, then gently swirl the solution.';
+ assert.equal(guardOutputSafety(r,q).replaced,true);
+});
+test('WP04-G4.1: cited study with actionable equipment recommendation remains blocked', () => {
+ const r='The BPC-157 study used an injection route. For your preparation, choose an insulin syringe with a needle gauge for the vial.';
+ assert.equal(guardOutputSafety(r,q).replaced,true);
+});
+test('WP04-G4.1: historical study attribution must not excuse an instructional clause', () => {
+ const r='The BPC-157 study reported an injection. Use a syringe to prepare the vial with water.';
+ assert.equal(guardOutputSafety(r,q).replaced,true);
+});
+test('WP04-G4.1: a complete cited report containing study methods is not replaced', () => {
+ const r='## Educational Research Summary\nBPC-157 was investigated in an uncontrolled 12-patient bladder pilot. In the study, injections were administered into the bladder wall during cystoscopy; there was no muscle-repair endpoint.\n[PMID: 39325560](https://pubmed.ncbi.nlm.nih.gov/39325560/)\n## Safety\nThe route described is a clinical method, not a recommendation.';
+ assert.equal(guardOutputSafety(r,q).reply,r);
+});
