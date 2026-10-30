@@ -37,6 +37,7 @@ export function createMembershipHandler(env=process.env) {
   });
   const handler=toNodeHandler(auth);
   const handle=async (req,res)=>{
+    try {
     const origin=String(req.headers.origin||'');
     const access=membershipAccess(origin,req.method||'',env);
     res.setHeader('Cache-Control','no-store');
@@ -61,7 +62,14 @@ export function createMembershipHandler(env=process.env) {
       res.end(JSON.stringify({user:{id:user.id,email:user.email,emailVerified:user.emailVerified}}));
       return;
     }
-    return handler(req,res);
+    return await handler(req,res);
+    } catch {
+      // Do not log sessions, credentials, request bodies or user data.
+      if(!res.headersSent) {
+        res.writeHead(500,{'Content-Type':'application/json','Cache-Control':'no-store'});
+        res.end(JSON.stringify({error:'Membership temporarily unavailable'}));
+      } else if(!res.writableEnded) res.end();
+    }
   };
   return {handle,close:()=>pool.end()};
 }
