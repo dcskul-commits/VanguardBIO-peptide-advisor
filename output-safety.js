@@ -15,6 +15,7 @@ const studyMethod = /\b(?:administered|was given|were given|used in (?:a |the )?
 // Actual handling sequences cannot acquire an exception from study citations.
 const operationalSequence = /\b(?:then|until|afterwards?|first|next|to prepare|to reconstitute|against the inside|inside wall|with bacteriostatic|with water|gently|slowly|down the side)\b/i;
 const studyAttribution = /\b(?:study|studies|trial|trials|pilot|publication|paper|article|authors?|methods?|patients?|participants?|subjects?|during cystoscopy|intravesical|clinical|animal|research|PMID)\b/i;
+const preparationMaterial = /\b(?:water|powder|vial|bacteriostatic|reconstitution|diluent|dilution|mixing volume|container)\b/i;
 
 export const SAFE_REPLY = 'I can explain published evidence and safety uncertainties about experimental peptides, but cannot provide reconstitution steps, injection preparation, syringe or needle specifications, mixing volumes, or individualized administration guidance. Consult a licensed healthcare professional or pharmacist for medical decisions.';
 
@@ -39,7 +40,9 @@ function assessUnit(raw) {
   // The exception is clause-local and never covers directives, equipment
   // recommendations, or operational handling sequences.
   if(academic && studyAttribution.test(s) && studyMethod.test(s) &&
-      !directs && !operationalSequence.test(s)) return null;
+      !directs && !operationalSequence.test(s) && !preparationMaterial.test(s)) return null;
+  // Even past-tense attribution cannot make reagent/vial handling safe.
+  if(hasAction && preparationMaterial.test(s) && hasSequence && !negative) return 'procedure';
   if(hasEquipment && (directs || (hasSequence && hasAction))) return 'equipment';
   if(hasAction && ((directs && !negative) || (hasSequence && (!academic || directs)))) return 'procedure';
   return null;
