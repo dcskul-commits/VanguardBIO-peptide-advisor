@@ -10,6 +10,7 @@ import {
 import { retrieveResearchSources } from './research-sources.js';
 import { guardContentQuality, auditCitationMetadata, appendRetrievedPubMedReferences, removeModelPubMedBibliography } from './content-quality.js';
 import { assessIntakeReport } from './report-completion.js';
+import { guardOutputSafety } from './output-safety.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
@@ -354,6 +355,7 @@ Invite follow-up questions and allow the conversation to continue.
 The PDF report is generated separately when the user requests it.
 
 MEDICAL AND RESEARCH SAFETY
+When asked about experimental peptide preparation or use, do not give reconstitution procedures, vial mixing steps, injection preparation instructions, needle gauge, syringe sizes, mixing volumes, concentration calculations, or specific administration directions. Do not provide a refusal and then give these steps anyway. Discuss contamination risks and lack of validated human protocols instead.
 Do not diagnose, prescribe, or give individualized treatment plans, doses, schedules, cycles, stacks, injection or reconstitution instructions, or sourcing for restricted, unapproved or research-use-only peptides.
 Instead, provide general evidence and safety context and questions for a licensed clinician.
 Do not treat research-use-only products as safe for human use.
@@ -953,7 +955,9 @@ if (citationWarnings.length)
 const attributedReply = isCompletedResearchReport && expandedEvidenceIndex
   ? finalWithSources + '\n\n---\n\n' + expandedEvidenceIndex
   : finalWithSources;
-return send(res, 200, { reply: attributedReply }, extra);
+const safetyChecked = guardOutputSafety(attributedReply, conversationText);
+if (safetyChecked.replaced) console.warn('OUTPUT_SAFETY_GUARD', JSON.stringify({ reason: safetyChecked.reason, reportMode }));
+return send(res, 200, { reply: safetyChecked.reply }, extra);
 
   } catch (err) {
     const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
