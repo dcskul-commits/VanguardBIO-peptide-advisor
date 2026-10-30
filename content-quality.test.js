@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {guardContentQuality, auditCitationMetadata, appendRetrievedPubMedReferences, removeModelPubMedBibliography} from './content-quality.js';
+import {guardContentQuality, auditCitationMetadata, appendRetrievedPubMedReferences, removeModelPubMedBibliography, refineReviewedEvidenceClaims} from './content-quality.js';
 
 test('research-only is not FDA approval', () => {
  const {reply}=guardContentQuality('MK-677 | approved for research only | S2.2.4\nNot FDA-approved for muscle repair or any indication outside research.');
@@ -76,4 +76,37 @@ test('single backend bibliography wins over mismatched model references',()=>{
  assert.match(out,/PMID: 40789979/);
  assert.match(out,/compounds mentioned: BPC-157/);
  assert.match(out,/Trial outcomes were mixed/);
+});
+
+
+test('WP04-G4: BPC pilot citation does not misdescribe the injection as intravesical',()=>{
+ const input='- One small pilot in 12 women with interstitial cystitis reported symptom resolution after intravesical injection of BPC-157 [PMID: 39325560](https://pubmed.ncbi.nlm.nih.gov/39325560/).';
+ const out=refineReviewedEvidenceClaims(input);
+ assert.match(out.reply,/injections during cystoscopy in a bladder-condition pilot/);
+ assert.doesNotMatch(out.reply,/intravesical injection/);
+ assert.match(out.reply,/PMID: 39325560/);
+ assert.deepEqual(out.corrections,['bpc_pilot_route_precision']);
+});
+test('WP04-G4: BPC review preclinical effects cannot become established human efficacy',()=>{
+ const input='- A systematic review found mostly preclinical studies (animal and in vitro) showing BPC-157 promotes healing in muscle, tendon and bone injuries [PMID: 40756949](https://pubmed.ncbi.nlm.nih.gov/40756949/).';
+ const out=refineReviewedEvidenceClaims(input);
+ assert.doesNotMatch(out.reply,/promotes healing/i);
+ assert.match(out.reply,/possible effects on tissue repair in preclinical research/i);
+ assert.match(out.reply,/do not establish effectiveness or safety in humans/i);
+ assert.match(out.reply,/PMID: 40756949/);
+});
+test('WP04-G4: MK-677 hip-fracture trial uses measured functional endpoints',()=>{
+ const input='- MK-677 in elderly hip fracture patients (n=123), phase IIb: increased IGF-1 but limited functional improvements in muscle strength or recovery; trial stopped for heart failure concern [PMID: 21067829](https://pubmed.ncbi.nlm.nih.gov/21067829/).';
+ const out=refineReviewedEvidenceClaims(input);
+ assert.match(out.reply,/limited improvement in most functional performance measures/);
+ assert.doesNotMatch(out.reply,/improvements in muscle strength or recovery/);
+ assert.match(out.reply,/heart failure/);
+});
+test('WP04-G4: no corrections on different PMIDs or missing clinical context',()=>{
+ const input='- BPC-157 promotes healing in animal models [PMID: 99999999].\n- Intravesical injection in other disease [PMID: 39325560].\n- MK-677 reported muscle strength in exercise study [PMID: 21067829].';
+ assert.equal(refineReviewedEvidenceClaims(input).reply,input);
+});
+test('WP04-G4: leave backend PubMed bibliography and already cautious statements unchanged',()=>{
+ const input='### Retrieved PubMed references (bibliographic records)\n- [PMID: 40756949](https://pubmed.ncbi.nlm.nih.gov/40756949/) — BPC-157 review, not a trial.\nBPC-157 animal experiments suggested possible effects on tissue repair; not established human effectiveness [PMID: 40756949](https://pubmed.ncbi.nlm.nih.gov/40756949/).';
+ assert.equal(refineReviewedEvidenceClaims(input).reply,input);
 });
