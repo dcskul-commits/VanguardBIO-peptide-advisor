@@ -138,13 +138,23 @@ export function refineReviewedEvidenceClaims(reply) {
   const revised = reply.split('\n').map(line => {
     if (/^\s*[-*]\s*\[PMID:|^\s*#{1,6}\s*Retrieved PubMed references/i.test(line)) return line;
     let updated = line;
-    if (/\b39325560\b/.test(line) && /\b(?:interstitial cystitis|bladder)\b/i.test(line) &&
-        /\b(?:intravesical injection|bladder instillation)\b/i.test(line)) {
-      updated = updated.replace(/\bafter (?:intravesical injection(?:s)?|bladder instillation(?:s)?) of BPC[\s-]?157\b/gi,
-        'following BPC-157 injections during cystoscopy')
-        .replace(/\b(?:intravesical injection(?:s)?|bladder instillation(?:s)?)\b/gi,
-          'BPC-157 injections during cystoscopy');
-      corrections.push('bpc_pilot_route_precision');
+    // The PubMed abstract itself uses "intravesical injection" in its
+    // conclusion. The methods describe injection during cystoscopy, not
+    // bladder *instillation*. Preserve source language; correct only an
+    // instillation claim or an ambiguous route missing methodological context.
+    if (/\b39325560\b/.test(line) &&
+        /\bBPC[\s-]?157\b/i.test(line) &&
+        /\b(?:interstitial cystitis|bladder)\b/i.test(line)) {
+      if (/\b(?:intravesical|bladder) instillation(?:s)?\b/i.test(updated)) {
+        updated = updated.replace(/\b(?:intravesical|bladder) instillation(?:s)?\b/gi,
+          'injections during cystoscopy');
+        corrections.push('bpc_pilot_instillation_precision');
+      } else if (/\bintravesical injection(?:s)?\b/i.test(updated) &&
+          !/\b(?:cystoscop\w*|bladder wall|bladder inflammation|area of inflammation)\b/i.test(updated)) {
+        updated = updated.replace(/\bintravesical injection(?:s)?\b/gi,
+          'intravesical injections during cystoscopy');
+        corrections.push('bpc_pilot_route_context');
+      }
     }
     if (/\b40756949\b/.test(line) && /\bBPC[\s-]?157\b/i.test(line) &&
         /\b(?:preclinical|animal|in vitro|systematic review)\b/i.test(line) &&
