@@ -140,15 +140,17 @@ export function refineReviewedEvidenceClaims(reply) {
     let updated = line;
     if (/\b39325560\b/.test(line) && /\b(?:interstitial cystitis|bladder)\b/i.test(line) &&
         /\b(?:intravesical injection|bladder instillation)\b/i.test(line)) {
-      updated = updated.replace(/\bintravesical injection(?:s)?\b|\bbladder instillation(?:s)?\b/gi,
-        'injections during cystoscopy in a bladder-condition pilot');
+      updated = updated.replace(/\bafter (?:intravesical injection(?:s)?|bladder instillation(?:s)?) of BPC[\s-]?157\b/gi,
+        'following BPC-157 injections during cystoscopy')
+        .replace(/\b(?:intravesical injection(?:s)?|bladder instillation(?:s)?)\b/gi,
+          'BPC-157 injections during cystoscopy');
       corrections.push('bpc_pilot_route_precision');
     }
     if (/\b40756949\b/.test(line) && /\bBPC[\s-]?157\b/i.test(line) &&
         /\b(?:preclinical|animal|in vitro|systematic review)\b/i.test(line) &&
         /\b(?:promotes?|accelerates?|demonstrates?)\s+(?:\w+\s+){0,3}(?:healing|repair)\b/i.test(line)) {
       updated = updated.replace(/\b(?:promotes?|accelerates?|demonstrates?)\s+(?:\w+\s+){0,3}(?:healing|repair)\b/gi,
-        'showed possible effects on tissue repair in preclinical research');
+        'may affect tissue repair in preclinical models');
       if (!/\b(?:not establish|does not establish|not proven|not demonstrated)\b[^.\n]*\bhumans?\b/i.test(updated)) {
         updated = updated.replace(/(\s*\[PMID:\s*40756949\]\(https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\/40756949\/?\))/i,
           ' These findings do not establish effectiveness or safety in humans.$1');
