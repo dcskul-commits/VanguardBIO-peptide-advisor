@@ -17,3 +17,14 @@ jobs:
       - run: node --check server.js
       - run: node --check output-safety.js
       - run: npm test
+  staging-acceptance:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node wp04_g4_live_acceptance.mjs
