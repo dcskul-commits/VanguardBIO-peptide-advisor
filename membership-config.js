@@ -2,6 +2,7 @@
 const STAGING_HOST = 'vanguardbio-peptide-advisor-staging.onrender.com';
 const PROD_HOST = 'vanguardbio-peptide-advisor.onrender.com';
 const PROD_ORIGIN = 'https://you.vanguardbio.ai';
+const STAGING_DB_INTERNAL_HOST = 'dpg-dbihntl9fdbs73dmumrg-a';
 export function membershipEnabled(env=process.env) { return env.MEMBERSHIP_ENABLED === 'true'; }
 export function membershipAccess(origin, method, env=process.env) {
   if (!membershipEnabled(env)) return { allowed: false, status: 404 };
@@ -23,6 +24,10 @@ export function validateMembershipConfig(env=process.env) {
   const dbURL = new URL(env.DATABASE_URL || 'https://invalid.local');
   if (!['postgres:','postgresql:'].includes(dbURL.protocol) || !dbURL.hostname || !dbURL.pathname || dbURL.pathname==='/')
     throw Error('staging Postgres DATABASE_URL required');
+  // Reject any other database destination even if the service was misconfigured.
+  // Render's private host is tied to the independently provisioned staging DB ID.
+  if (dbURL.hostname !== STAGING_DB_INTERNAL_HOST || dbURL.port && dbURL.port !== '5432')
+    throw Error('database must use the approved staging PostgreSQL internal host');
   if (env.MEMBERSHIP_DATABASE_ROLE !== 'staging')
     throw Error('explicit staging database role required');
   if (!env.BETTER_AUTH_SECRET || env.BETTER_AUTH_SECRET.length < 32)
