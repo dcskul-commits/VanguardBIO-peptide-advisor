@@ -8,7 +8,7 @@ import {
   fetchPubMedByPMID
 } from './pubmed.js';
 import { retrieveResearchSources } from './research-sources.js';
-import { guardContentQuality, auditCitationMetadata, appendRetrievedPubMedReferences, removeModelPubMedBibliography } from './content-quality.js';
+import { guardContentQuality, auditCitationMetadata, appendRetrievedPubMedReferences, removeModelPubMedBibliography, refineReviewedEvidenceClaims } from './content-quality.js';
 import { assessIntakeReport } from './report-completion.js';
 import { guardOutputSafety } from './output-safety.js';
 
@@ -381,10 +381,13 @@ CURRENT REGULATORY SOURCE PRIORITY
 4. Distinguish current FDA approval, historical FDA approval, discontinued products, investigational status, and unapproved uses. Never describe a compound as currently FDA-approved without verified current regulatory evidence. For sermorelin, explicitly distinguish historical approvals from current product status.
 
 5. For BPC-157, distinguish limited exploratory human evidence from randomized human clinical trials demonstrating muscle or tendon repair. Do not claim that no human research exists unless that claim has been verified.
+   - PMID 39325560: the uncontrolled 12-woman bladder-condition pilot describes injections during cystoscopy; do not describe it as an intravesical instillation, muscle-recovery trial, or evidence of musculoskeletal efficacy.
+   - PMID 40756949: characterize the musculoskeletal systematic review as overwhelmingly preclinical; experimental healing mechanisms suggest possibilities but do not establish human effectiveness or safety.
 
 6. For ipamorelin, distinguish evidence that it stimulates growth hormone release from evidence of clinically meaningful muscle recovery. Do not characterize its long-term safety as established without adequate human evidence.
 
 7. For MK-677 (ibutamoren), distinguish observed changes in GH, IGF-1, and lean body mass from demonstrated improvements in muscle strength, injury healing, or functional recovery. Discuss metabolic risks and limitations of long-term safety evidence.
+   - PMID 21067829: the hip-fracture phase IIb trial enrolled 123 older patients and found no improvement in most functional performance measures despite increased IGF-1; describe the heart-failure safety signal and early termination. Do not reframe functional endpoints as demonstrated muscle strength or exercise recovery.
 
 8. When comparing compounds, use evidence categories such as:
    - Human clinical benefit demonstrated
@@ -942,8 +945,13 @@ const isCompletedResearchReport = (justAnsweredQuestionSix || isFinalResearchReq
   /(?:educational research|executive summary|evidence comparison|human clinical evidence)/i.test(formattedReply);
 const bibliographyFilteredReply = isCompletedResearchReport
   ? removeModelPubMedBibliography(formattedReply) : formattedReply;
+const reviewedEvidence = isCompletedResearchReport
+  ? refineReviewedEvidenceClaims(bibliographyFilteredReply)
+  : { reply: bibliographyFilteredReply, corrections: [] };
+if (reviewedEvidence.corrections.length)
+  console.warn('EVIDENCE_PRECISION_GUARD', JSON.stringify({ corrections: reviewedEvidence.corrections }));
 const withPubMedReferences = appendRetrievedPubMedReferences(
-  bibliographyFilteredReply, retrievedStudies, isCompletedResearchReport
+  reviewedEvidence.reply, retrievedStudies, isCompletedResearchReport
 );
 const finalWithSources = appendOfficialRegulatorySources(withPubMedReferences, isCompletedResearchReport);
 // Check only the same content that is returned to the user, after safeguards,
