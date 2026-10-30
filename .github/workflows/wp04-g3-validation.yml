@@ -1,0 +1,19 @@
+name: WP04-G3 branch validation
+on:
+  push:
+    branches:
+      - wp04-g3-output-safety-20261030
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check server.js
+      - run: node --check output-safety.js
+      - run: npm test
