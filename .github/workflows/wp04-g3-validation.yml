@@ -28,3 +28,14 @@ jobs:
         with:
           node-version: '22'
       - run: node wp04_g4_live_acceptance.mjs
+  production-smoke:
+    if: github.event_name == 'push' && github.event.head_commit.message == 'WP04 production smoke checkpoint (approved)'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node wp04_production_smoke.mjs
