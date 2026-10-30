@@ -79,13 +79,28 @@ test('single backend bibliography wins over mismatched model references',()=>{
 });
 
 
-test('WP04-G4: BPC pilot citation does not misdescribe the injection as intravesical',()=>{
+test('WP04-G4: source-authored intravesical injection is retained and contextualized',()=>{
  const input='- One small pilot in 12 women with interstitial cystitis reported symptom resolution after intravesical injection of BPC-157 [PMID: 39325560](https://pubmed.ncbi.nlm.nih.gov/39325560/).';
  const out=refineReviewedEvidenceClaims(input);
- assert.match(out.reply,/following BPC-157 injections during cystoscopy/);
- assert.doesNotMatch(out.reply,/intravesical injection/);
+ assert.match(out.reply,/intravesical injections during cystoscopy of BPC-157/);
  assert.match(out.reply,/PMID: 39325560/);
- assert.deepEqual(out.corrections,['bpc_pilot_route_precision']);
+ assert.deepEqual(out.corrections,['bpc_pilot_route_context']);
+});
+test('WP04-G4: accurate source wording with cystoscopy does not get rewritten',()=>{
+ const input='- In a 12-patient interstitial cystitis pilot, intravesical BPC-157 injections during cystoscopy were reported; no controls and no muscle recovery endpoint [PMID: 39325560](https://pubmed.ncbi.nlm.nih.gov/39325560/).';
+ assert.equal(refineReviewedEvidenceClaims(input).reply,input);
+});
+test('WP04-G4: bladder instillation is corrected without changing the study citation',()=>{
+ const input='- A BPC-157 pilot with interstitial cystitis reported benefits after bladder instillation [PMID: 39325560](https://pubmed.ncbi.nlm.nih.gov/39325560/).';
+ const out=refineReviewedEvidenceClaims(input);
+ assert.doesNotMatch(out.reply,/bladder instillation/);
+ assert.match(out.reply,/injections during cystoscopy/);
+ assert.match(out.reply,/PMID: 39325560/);
+ assert.deepEqual(out.corrections,['bpc_pilot_instillation_precision']);
+});
+test('WP04-G4: term intravesical injection by itself is not a scientific error',()=>{
+ const line='- A pilot with interstitial cystitis investigated BPC-157 intravesical injection during cystoscopy [PMID: 39325560](https://pubmed.ncbi.nlm.nih.gov/39325560/).';
+ assert.equal(refineReviewedEvidenceClaims(line).reply,line);
 });
 test('WP04-G4: BPC review preclinical effects cannot become established human efficacy',()=>{
  const input='- A systematic review found mostly preclinical studies (animal and in vitro) showing BPC-157 promotes healing in muscle, tendon and bone injuries [PMID: 40756949](https://pubmed.ncbi.nlm.nih.gov/40756949/).';
