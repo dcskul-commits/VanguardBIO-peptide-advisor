@@ -464,8 +464,8 @@ function validate(body) {
   return messages.at(-1).role === 'user' ? messages : null;
 }
 
-const server = http.createServer(async (req, res) => {
-  const pathname = new URL(req.url || '/', 'http://localhost').pathname;
+// WP06-C2: only activate after explicit staging DB approval and secret setup.\nconst membershipHandler = process.env.MEMBERSHIP_ENABLED === 'true'\n  ? (await import('./membership-auth.js')).createMembershipHandler(process.env)\n  : null;\n\nconst server = http.createServer(async (req, res) => {
+  const pathname = new URL(req.url || '/', 'http://localhost').pathname;\n  if (pathname.startsWith('/api/auth/')) {\n    if (!membershipHandler) return send(res, 404, {error:'Not found.'});\n    return membershipHandler.handle(req,res);\n  }
   const origin = req.headers.origin || '';
   if (pathname === '/health' && req.method === 'GET') return send(res, 200, { status: 'ok' });
   // Legacy standalone widget routes retained for existing integrations.
