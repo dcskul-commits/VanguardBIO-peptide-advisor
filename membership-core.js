@@ -7,6 +7,7 @@ export function buildMembershipAuth({database,baseURL,secret,trustedOrigins,send
     baseURL,secret,database,trustedOrigins,
     emailAndPassword:{
       enabled:true,requireEmailVerification:true,minPasswordLength:12,
+      revokeSessionsOnPasswordReset:true,
       sendResetPassword: async ({user,url})=>sendEmail({to:user.email,subject:'VanguardBio-You password reset',url})
     },
     emailVerification:{
