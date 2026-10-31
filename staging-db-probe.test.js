@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {probeStagingDatabase} from './staging-db-probe.js';
+const base={RENDER_SERVICE_ID:'srv-dbib14gm7kps73cd1440',MEMBERSHIP_ENABLED:'false',DATABASE_URL:'postgresql://user:REDACTED@dpg-dbihntl9fdbs73dmumrg-a/vanguardbio_membership_staging'};
+test('probe inert in production',async()=>assert.deepEqual(await probeStagingDatabase({...base,RENDER_SERVICE_ID:'srv-dbd2t9mi0phs7380t180'}),{status:'skipped'}));
+test('probe inert when membership enabled',async()=>assert.deepEqual(await probeStagingDatabase({...base,MEMBERSHIP_ENABLED:'true'}),{status:'skipped_auth_enabled'}));
+test('missing connection never sends query',async()=>assert.deepEqual(await probeStagingDatabase({...base,DATABASE_URL:''}),{status:'missing_connection'}));
+test('production/other DB hostname refused',async()=>assert.deepEqual(await probeStagingDatabase({...base,DATABASE_URL:'postgresql://user:pw@production.example/vanguardbio_membership_staging'}),{status:'unapproved_target'}));
+test('unexpected DB name refused',async()=>assert.deepEqual(await probeStagingDatabase({...base,DATABASE_URL:'postgresql://user:pw@dpg-dbihntl9fdbs73dmumrg-a/production'}),{status:'unapproved_target'}));
+test('approved private DB responds',async()=>{let ended=false;class Pool{async query(sql){assert.equal(sql,'SELECT current_database() AS db');return {rows:[{db:'vanguardbio_membership_staging'}]};}async end(){ended=true;}} assert.deepEqual(await probeStagingDatabase(base,{Pool}),{status:'connected'});assert.equal(ended,true)});
+test('failed DB connection returns sanitized status',async()=>{class Pool{async query(){throw Error('SECRET-MUST-NOT-LEAK')}async end(){}}assert.deepEqual(await probeStagingDatabase(base,{Pool}),{status:'connection_failed'})});
