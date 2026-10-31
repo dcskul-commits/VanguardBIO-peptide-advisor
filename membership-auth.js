@@ -19,7 +19,7 @@ export function createMembershipHandler(env=process.env) {
   });
   const auth=buildMembershipAuth({
     database:pool,baseURL:cfg.authURL,secret:env.BETTER_AUTH_SECRET,
-    trustedOrigins:[cfg.previewOrigin],
+    trustedOrigins:[cfg.previewOrigin,cfg.authURL],
     sendEmail:(message)=>sendMembershipEmail(message,env)
   });
   const handler=toNodeHandler(auth);
