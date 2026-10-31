@@ -29,6 +29,8 @@ jobs:
         with:
           node-version: '22'
       - run: npm install --no-audit --no-fund
+      - run: node --check wp06-stage-schema.js
+      - run: node --test wp06-stage-schema.test.js
       - run: node --check membership-core.js
       - run: node --check membership-auth.js
       - run: node --check wp06-auth-lifecycle-ci.mjs
