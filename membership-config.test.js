@@ -28,3 +28,7 @@ test('same origin production not allowed',()=>{assert.throws(()=>validateMembers
 
 test('production or unknown database hostname denied',()=>{assert.throws(()=>validateMembershipConfig({...valid,DATABASE_URL:'postgres://x:x@production-db.example/staging'}))});
 test('external database host denied',()=>{assert.throws(()=>validateMembershipConfig({...valid,DATABASE_URL:'postgres://x:x@dpg-dbihntl9fdbs73dmumrg-a.oregon-postgres.render.com/staging'}))});
+
+test('exact staging same-origin POST accepted for staged password recovery',()=>{assert.equal(membershipAccess('https://vanguardbio-peptide-advisor-staging.onrender.com','POST',valid).allowed,true)});
+test('production Render origin remains denied',()=>{assert.equal(membershipAccess('https://vanguardbio-peptide-advisor.onrender.com','POST',valid).status,403)});
+test('staging hostname lookalike remains denied',()=>{assert.equal(membershipAccess('https://vanguardbio-peptide-advisor-staging.onrender.com.attacker.example','POST',valid).status,403)});
