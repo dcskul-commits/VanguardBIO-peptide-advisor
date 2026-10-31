@@ -1,5 +1,5 @@
 // WP06 single-purpose, user-approved staging password recovery request.
-// No passwords, tokens or email contents logged.
+// No passwords, tokens or email contents logged. Single authorized dispatch.
 const base='https://vanguardbio-peptide-advisor-staging.onrender.com';
 const response=await fetch(base+'/api/auth/request-password-reset',{
  method:'POST',redirect:'manual',signal:AbortSignal.timeout(25000),
