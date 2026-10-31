@@ -60,18 +60,44 @@ if(page==='/membership/password-reset'){
    finally{$('login-submit').disabled=false}
  });
  $('signout').addEventListener('click',async()=>{
-   const r=await post('sign-out',{});
-   status(r.ok?'Signed out.':'Sign-out request failed.',r.ok);
-   await checkSession();
- });
- $('check-session').addEventListener('click',checkSession);
- async function checkSession(){
+   $('signout').disabled=true;
+   status('Signing out…');
    try{
-     const r=await fetch('/api/membership/me',{credentials:'include',cache:'no-store'});
-     const data=r.ok?await r.json():null;
-     $('session').textContent=r.ok&&data?.user?'Authenticated session: '+(data.user.emailVerified?'email verified':'email not verified'):'No authenticated session';
-     $('signout').disabled=!r.ok;
-   }catch{$('session').textContent='Session check unavailable'}
+     const r=await post('sign-out',{});
+     if(!r.ok){status('Sign-out request failed. Retry or refresh.');await checkSession(false);return}
+     await checkSession(false);
+     status($('session').textContent==='No authenticated session'?'Signed out. Session invalidated.':'Sign-out submitted; session verification incomplete.',$('session').textContent==='No authenticated session');
+   }catch{
+     status('Unable to confirm sign-out. Refresh and check session.');
+     await checkSession(false);
+   }
+ });
+ $('check-session').addEventListener('click',()=>checkSession(true));
+ async function checkSession(report=true){
+   $('session').textContent='Checking session…';
+   $('check-session').disabled=true;
+   try{
+     const r=await fetch('/api/membership/me',{credentials:'include',cache:'no-store',signal:AbortSignal.timeout(12000)});
+     if(r.status===401){
+       $('session').textContent='No authenticated session';
+       $('signout').disabled=true;
+       if(report)status('Session checked: signed out.',true);
+     }else if(r.ok){
+       const data=await r.json();
+       if(!data?.user)throw Error('Missing session user');
+       $('session').textContent='Authenticated session: '+(data.user.emailVerified?'email verified':'email not verified');
+       $('signout').disabled=false;
+       if(report)status('Session checked: still signed in.',true);
+     }else{
+       $('session').textContent='Session check unavailable';
+       $('signout').disabled=false;
+       if(report)status('Session check failed. Please retry.');
+     }
+   }catch{
+     $('session').textContent='Session check unavailable';
+     $('signout').disabled=false;
+     if(report)status('Could not reach the membership service. Please retry.');
+   }finally{$('check-session').disabled=false}
  }
- void checkSession();
+ void checkSession(false);
 }
