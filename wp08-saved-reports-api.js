@@ -40,6 +40,7 @@ export async function handleSavedReports(req,res,{session,pool,env=process.env})
  if(sub!==''&&!/^\/[0-9a-f-]+$/.test(sub)){json(res,404,{error:'Not found'});return true;}
  const reportId=sub===''?null:sub.slice(1);
  if(reportId&&!idPattern.test(reportId)){json(res,404,{error:'Not found'});return true;}
+ if(reportId && new URL(req.url||'/', 'http://localhost').search){json(res,400,{error:'Invalid query'});return true;}
  try{
    if(sub===''&&req.method==='GET'){
      const u=new URL(req.url||'/', 'http://localhost');
