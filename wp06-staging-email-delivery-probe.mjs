@@ -1,9 +1,9 @@
 // WP06 one-time staging signup delivery probe, using only an address approved by the user.
-// Run once for the explicitly approved address. Password created in-memory. No secrets, response bodies, or verification URLs logged.
+// Run once for the newly approved Gmail recipient. Password created in-memory. No secrets, response bodies, or verification URLs logged.
 import {randomBytes} from 'node:crypto';
 const endpoint='https://vanguardbio-peptide-advisor-staging.onrender.com/api/auth/sign-up/email';
 const expectedOrigin='https://g2uectlusc.preview.c37.airoapp.ai';
-const email='accounts@mail.vanguardbio.ai';
+const email='dcskul@gmail.com';
 const password='TestOnly!'+randomBytes(24).toString('base64url')+'9a';
 const r=await fetch(endpoint,{
  method:'POST',redirect:'manual',signal:AbortSignal.timeout(20000),
