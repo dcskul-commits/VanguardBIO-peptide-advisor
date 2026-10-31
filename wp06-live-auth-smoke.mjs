@@ -30,4 +30,6 @@ const testPage=await fetchStatus('/membership/test');
 assert(testPage.status===200 && testPage.body.includes('Send password reset email'),'staging_login_page',{status:testPage.status});
 const js=await fetchStatus('/membership/test.js');
 assert(js.status===200 && js.body.includes("request-password-reset") && js.body.includes("sign-in/email"),'staging_recovery_script',{status:js.status});
-console.log('WP06_AUTH_SMOKE_COMPLETE '+JSON.stringify({passed:true,checks:11,sentEmails:0,createdAccounts:0}));
+const badReset=await fetchStatus('/api/auth/reset-password',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({token:'invalid-test-token',newPassword:'Dummy-Test-Password-2026!23'})});
+assert([400,401,404,422,429].includes(badReset.status),'invalid_password_reset_rejected_without_network_failure',{status:badReset.status});
+console.log('WP06_AUTH_SMOKE_COMPLETE '+JSON.stringify({passed:true,checks:12,sentEmails:0,createdAccounts:0}));
