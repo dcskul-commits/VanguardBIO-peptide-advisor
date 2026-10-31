@@ -1,0 +1,20 @@
+name: WP08-B live staging saved-report access smoke
+on:
+  push:
+    branches: [wp04-g3-output-safety-20261030]
+    paths:
+      - 'wp08-live-saved-reports-smoke.mjs'
+      - '.github/workflows/wp08-live-reports-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  staging-reports:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check wp08-live-saved-reports-smoke.mjs
+      - run: node wp08-live-saved-reports-smoke.mjs
