@@ -77,6 +77,9 @@ try {
   assert.ok(resetDone.ok,'reset password failed '+resetDone.status);
   const oldLogin=await post('sign-in/email',{email:user,password:pw});
   assert.ok(!oldLogin.ok,'old password should be rejected');
+  // Better Auth has a stricter per-login burst limit than its global 30/min rule.
+  // Keep rate limiting ENABLED; allow the short CI login window to reset.
+  await new Promise(resolve=>setTimeout(resolve,11_000));
   const newLogin=await post('sign-in/email',{email:user,password:newPw});
   const loginResult=await newLogin.json().catch(()=>({}));
   console.log('WP06_CI_POST_RESET_LOGIN',{status:newLogin.status,code:loginResult?.code??null});
