@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VanguardBio-You — Staging Membership</title>
+<meta name="robots" content="noindex,nofollow">
+<style>
+:root{color-scheme:dark;font:16px system-ui,sans-serif;background:#10203b;color:#f4f5f7}
+body{max-width:560px;margin:8vh auto;padding:0 20px}
+main{background:#192e4b;border:1px solid #415775;border-radius:14px;padding:30px}
+h1{margin-top:0;color:#d6bb6d;font-size:1.7rem}
+p{line-height:1.5}
+label{display:block;margin-top:16px;font-weight:600}
+input{display:block;width:100%;box-sizing:border-box;padding:12px;margin-top:6px;border:1px solid #8493a9;border-radius:6px;background:#fff;color:#10203b;font:inherit}
+button{font:inherit;cursor:pointer;border:0;border-radius:6px;background:#d6bb6d;color:#10203b;padding:11px 16px;margin-top:18px;font-weight:700}
+button:disabled{opacity:.55;cursor:default}
+a{color:#d6bb6d}
+#status{min-height:24px}#status[data-ok=true]{color:#b9f2c8}
+.small{color:#c6d3e4;font-size:.85rem}
+[hidden]{display:none!important}
+</style></head><body><main>
+<h1>VanguardBio-You Membership</h1>
+<p class="small">Staging test environment — not production</p>
+<section id="login-panel">
+ <h2>Sign in</h2>
+ <label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
+ <form id="login-form"><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+ <button id="login-submit" type="submit">Sign in</button></form>
+ <p id="session" role="status">Checking session…</p>
+ <button id="check-session" type="button">Check session</button> <button id="signout" type="button" disabled>Sign out</button>
+ <h2>Password recovery</h2>
+ <form id="request-form"><button id="request-submit" type="submit">Send password reset email</button></form>
+</section>
+<section id="reset-panel" hidden>
+ <h2>Choose a new password</h2>
+ <p>Create a unique password with at least 12 characters. Your password stays in your browser until securely submitted to staging.</p>
+ <form id="reset-form">
+ <label for="new-password">New password</label><input id="new-password" type="password" autocomplete="new-password" minlength="12" required>
+ <label for="confirm-password">Confirm password</label><input id="confirm-password" type="password" autocomplete="new-password" minlength="12" required>
+ <button id="reset-submit" type="submit">Reset password</button></form>
+</section>
+<p id="status" role="status" aria-live="polite"></p>
+<p><a href="/membership/test" id="login-link" hidden>Return to staging sign-in</a></p>
+</main><script defer src="/membership/test.js"></script></body></html>
