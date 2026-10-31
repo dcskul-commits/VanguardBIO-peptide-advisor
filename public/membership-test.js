@@ -73,6 +73,27 @@ if(page==='/membership/password-reset'){
    }
  });
  $('check-session').addEventListener('click',()=>checkSession(true));
+ $('check-workspace').addEventListener('click',async()=>{
+   const button=$('check-workspace');
+   button.disabled=true;
+   $('workspace-status').textContent='Checking member-only access…';
+   try {
+     const r=await fetch('/api/membership/workspace',{credentials:'include',cache:'no-store',signal:AbortSignal.timeout(12000)});
+     if(r.status===401){
+       $('workspace-status').textContent='Member-only access denied (401): no verified active session.';
+     }else if(r.ok){
+       const result=await r.json();
+       $('workspace-status').textContent=result?.access?.memberWorkspace===true
+         ? 'Member-only access granted (200): verified session.'
+         : 'Unexpected workspace response; access not confirmed.';
+     }else{
+       $('workspace-status').textContent='Workspace check unavailable (HTTP '+r.status+').';
+     }
+   }catch{
+     $('workspace-status').textContent='Workspace check network error. Try again.';
+   }finally{button.disabled=false}
+ });
+
  async function checkSession(report=true){
    $('session').textContent='Checking session…';
    $('check-session').disabled=true;
