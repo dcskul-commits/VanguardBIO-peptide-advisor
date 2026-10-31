@@ -17,6 +17,7 @@ jobs:
       - run: node --check server.js
       - run: node --check output-safety.js
       - run: npm test
+      - run: node --test staging-db-probe.test.js
   staging-acceptance:
     needs: test
     runs-on: ubuntu-latest
