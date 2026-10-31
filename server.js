@@ -487,6 +487,24 @@ const server = http.createServer(async (req, res) => {
     });
     res.end(html);return;
   }
+  // Isolated staging-only browser acceptance pages; no Airo/production routes.
+  if (process.env.RENDER_SERVICE_ID === 'srv-dbib14gm7kps73cd1440' &&
+      req.method === 'GET' &&
+      ['/membership/test','/membership/password-reset','/membership/test.js'].includes(pathname)) {
+    const isScript = pathname === '/membership/test.js';
+    try {
+      const data = await readFile(path.join(ROOT,'public',isScript?'membership-test.js':'membership-test.html'));
+      res.writeHead(200,{
+        'Content-Type':isScript?'text/javascript; charset=utf-8':'text/html; charset=utf-8',
+        'Cache-Control':'no-store',
+        'Referrer-Policy':'no-referrer',
+        'X-Content-Type-Options':'nosniff',
+        'X-Robots-Tag':'noindex, nofollow',
+        'Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'"
+      });
+      res.end(data);return;
+    } catch { return send(res,503,{error:'Staging membership page temporarily unavailable.'}); }
+  }
   if (pathname.startsWith('/api/auth/') || pathname === '/api/membership/me') {
     if (!membershipHandler) return send(res, 404, {error:'Not found.'});
     return membershipHandler.handle(req,res);
