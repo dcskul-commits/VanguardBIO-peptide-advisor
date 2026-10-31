@@ -59,7 +59,7 @@ try{
  r=await invoke('POST','/api/member/reports',member('synthetic-a'),{title:'X',body:'X',explicitSave:true,owner_id:'synthetic-b'});
  check('forged_owner_rejected',r.status===400);
  r=await invoke('GET','/api/member/reports/'+a+'?junk=1',member('synthetic-a'));
- check('unknown_query_not_private_leak',r.status===200||r.status===400);
+ check('unknown_query_rejected',r.status===400);
  r=await invoke('GET','/api/member/reports',member('synthetic-a'));
  check('no_report_body_in_list',r.status===200&&!JSON.stringify(r.json).includes('Synthetic educational report A'));
  r=await invoke('DELETE','/api/member/reports/'+a,member('synthetic-a'));
