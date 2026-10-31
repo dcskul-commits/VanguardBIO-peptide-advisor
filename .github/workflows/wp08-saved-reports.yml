@@ -1,0 +1,39 @@
+name: WP08-B isolated two-account saved-report security
+on:
+  push:
+    branches: [wp04-g3-output-safety-20261030]
+    paths:
+      - 'wp08-*'
+      - 'membership-auth.js'
+      - 'server.js'
+      - 'package.json'
+      - '.github/workflows/wp08-saved-reports.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  saved-report-isolation:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: wp08_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_only_password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d wp08_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      CI_POSTGRES_URL: postgresql://postgres:ci_only_password@127.0.0.1:5432/wp08_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: node --check wp08-stage-schema.js
+      - run: node --check wp08-saved-reports-api.js
+      - run: node --test wp08-saved-reports-proposal.test.js
+      - run: node wp08-saved-reports-postgres-ci.mjs
