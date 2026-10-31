@@ -1,5 +1,6 @@
 // WP06-C2: explicit staging-only fail-closed configuration. Never log secrets.
 const STAGING_HOST = 'vanguardbio-peptide-advisor-staging.onrender.com';
+const STAGING_ORIGIN = 'https://' + STAGING_HOST;
 const PROD_HOST = 'vanguardbio-peptide-advisor.onrender.com';
 const PROD_ORIGIN = 'https://you.vanguardbio.ai';
 const STAGING_DB_INTERNAL_HOST = 'dpg-dbihntl9fdbs73dmumrg-a';
@@ -9,7 +10,7 @@ export function membershipAccess(origin, method, env=process.env) {
   const trusted = env.MEMBERSHIP_PREVIEW_ORIGIN;
   if (!trusted || trusted === PROD_ORIGIN || !/^https:\/\/[a-z0-9-]+\.preview\.c[0-9]+\.airoapp\.ai$/.test(trusted))
     return {allowed:false,status:503};
-  if (origin && origin !== trusted) return { allowed:false,status:403 };
+  if (origin && origin !== trusted && origin !== STAGING_ORIGIN) return { allowed:false,status:403 };
   if (!origin && !['GET','HEAD'].includes(method)) return {allowed:false,status:403};
   return {allowed:true,status:200,origin:origin===trusted?origin:null};
 }
