@@ -471,6 +471,22 @@ const membershipHandler = process.env.MEMBERSHIP_ENABLED === 'true'
 
 const server = http.createServer(async (req, res) => {
   const pathname = new URL(req.url || '/', 'http://localhost').pathname;
+  // Same-origin, non-sensitive email verification landing page.
+  // Confirmation is shown only after Better Auth redirects from /api/auth/verify-email.
+  if (req.method === 'GET' && pathname === '/membership/verified') {
+    const hasError = new URL(req.url || '/', 'http://localhost').searchParams.has('error');
+    const heading = hasError ? 'Email verification not completed' : 'Email verification link processed';
+    const note = hasError
+      ? 'The link may have expired or already been used. Request a fresh verification email if your account is still unverified.'
+      : 'Your verification link has been processed. Continue with account access or password recovery.';
+    const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VanguardBio-You Membership</title></head><body><main><h1>'+heading+'</h1><p>'+note+'</p><p>VanguardBio-You — staging membership testing</p></main></body></html>';
+    res.writeHead(hasError ? 400 : 200, {
+      'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store',
+      'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+      'X-Content-Type-Options':'nosniff'
+    });
+    res.end(html);return;
+  }
   if (pathname.startsWith('/api/auth/') || pathname === '/api/membership/me') {
     if (!membershipHandler) return send(res, 404, {error:'Not found.'});
     return membershipHandler.handle(req,res);
