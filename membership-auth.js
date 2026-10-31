@@ -6,6 +6,7 @@ import pg from 'pg';
 import { validateMembershipConfig, membershipAccess } from './membership-config.js';
 import { sendMembershipEmail } from './membership-email.js';
 import { memberWorkspaceDecision } from './membership-authorization.js';
+import { handleSavedReports } from './wp08-saved-reports-api.js';
 
 export function createMembershipHandler(env=process.env) {
   const cfg=validateMembershipConfig(env);
@@ -39,6 +40,13 @@ export function createMembershipHandler(env=process.env) {
     }
     if(req.method==='OPTIONS'){res.writeHead(204);res.end();return;}
     const memberRoute = req.url?.split('?')[0];
+    if (memberRoute === '/api/member/reports' || memberRoute?.startsWith('/api/member/reports/')) {
+      const session=await auth.api.getSession({headers:new Headers(
+        Object.entries(req.headers).filter(([_,v])=>typeof v==='string').map(([k,v])=>[k,v])
+      )});
+      await handleSavedReports(req,res,{session,pool,env});
+      return;
+    }
     if(memberRoute === '/api/membership/me' || memberRoute === '/api/membership/workspace') {
       if(req.method!=='GET'){res.writeHead(405,{Allow:'GET, OPTIONS'});res.end();return;}
       // Better Auth validates the session on the server; never trust client-supplied user IDs.
