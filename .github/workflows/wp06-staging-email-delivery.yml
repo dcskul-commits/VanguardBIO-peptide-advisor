@@ -1,0 +1,20 @@
+name: WP06 staging email delivery acceptance
+on:
+  push:
+    branches:
+      - wp04-g3-output-safety-20261030
+    paths:
+      - wp06-staging-email-delivery-probe.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  email-delivery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check wp06-staging-email-delivery-probe.mjs
+      - run: node wp06-staging-email-delivery-probe.mjs
