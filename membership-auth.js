@@ -1,6 +1,6 @@
 // Loads only after staging-only environment preflight has passed.
 // Separate staged auth and DB credentials; never import from Airo's shared secrets.
-import { betterAuth } from 'better-auth';
+import { buildMembershipAuth } from './membership-core.js';
 import { toNodeHandler } from 'better-auth/node';
 import pg from 'pg';
 import { validateMembershipConfig, membershipAccess } from './membership-config.js';
@@ -17,23 +17,10 @@ export function createMembershipHandler(env=process.env) {
     // Do not use a publicly reachable database host; config enforces exact staging host.
     ssl: false
   });
-  const auth=betterAuth({
-    baseURL:cfg.authURL,
-    secret:env.BETTER_AUTH_SECRET,
-    database:pool,
+  const auth=buildMembershipAuth({
+    database:pool,baseURL:cfg.authURL,secret:env.BETTER_AUTH_SECRET,
     trustedOrigins:[cfg.previewOrigin],
-    emailAndPassword:{
-      enabled:true,
-      requireEmailVerification:true,
-      minPasswordLength:12,
-      sendResetPassword:async ({user,url})=>sendMembershipEmail({to:user.email,subject:'VanguardBio-You password reset',url},env)
-    },
-    emailVerification:{
-      sendOnSignUp:true,
-      sendOnSignIn:true,
-      sendVerificationEmail:async ({user,url})=>sendMembershipEmail({to:user.email,subject:'Verify your VanguardBio-You email',url},env)
-    },
-    advanced:{ defaultCookieAttributes:{secure:true,httpOnly:true,sameSite:'none'} }
+    sendEmail:(message)=>sendMembershipEmail(message,env)
   });
   const handler=toNodeHandler(auth);
   const handle=async (req,res)=>{

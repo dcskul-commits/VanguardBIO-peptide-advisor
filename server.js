@@ -1040,7 +1040,21 @@ return send(res, 200, { reply: safetyChecked.reply }, extra);
 // override Airo's fetch timeout, Render's proxy, or the OpenAI AbortSignal.
 server.requestTimeout = 40_000;
 server.headersTimeout = 15_000;
-server.listen(PORT, '0.0.0.0', () => console.log(`VanguardBio-You API listening on ${PORT}`));
+async function wp06Start() {
+  if (process.env.WP06_APPLY_SCHEMA === 'approved-20261031') {
+    try {
+      const {initializeApprovedStagingSchema}=await import('./wp06-stage-schema.js');
+      const result=await initializeApprovedStagingSchema();
+      console.info('WP06_STAGING_SCHEMA',JSON.stringify(result));
+    } catch {
+      console.error('WP06_STAGING_SCHEMA',JSON.stringify({status:'failed_closed'}));
+      process.exitCode=1;
+      return;
+    }
+  }
+  server.listen(PORT, '0.0.0.0', () => console.log(`VanguardBio-You API listening on ${PORT}`));
+}
+void wp06Start();
 // Staging only; read-only SELECT 1-equivalent and sanitized one-line status.
 if (process.env.RENDER_SERVICE_ID === 'srv-dbib14gm7kps73cd1440') {
   import('./staging-db-probe.js').then(({probeStagingDatabase})=>probeStagingDatabase())

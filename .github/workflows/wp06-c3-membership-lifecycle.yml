@@ -1,0 +1,38 @@
+name: WP06-C3 isolated membership lifecycle
+on:
+  push:
+    branches:
+      - wp06-c3-auth-schema-email-tests
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  membership-lifecycle:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: auth_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_test_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d auth_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      CI_POSTGRES_URL: postgresql://postgres:ci_test_only@127.0.0.1:5432/auth_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: node --check wp06-stage-schema.js
+      - run: node --test wp06-stage-schema.test.js
+      - run: node --check membership-core.js
+      - run: node --check membership-auth.js
+      - run: node --check wp06-auth-lifecycle-ci.mjs
+      - run: npm test
+      - run: node wp06-auth-lifecycle-ci.mjs
