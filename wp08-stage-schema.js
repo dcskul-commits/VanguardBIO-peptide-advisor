@@ -5,7 +5,7 @@ const STAGING_SERVICE='srv-dbib14gm7kps73cd1440';
 const STAGING_DATABASE_HOST='dpg-dbihntl9fdbs73dmumrg-a';
 const STAGING_DATABASE_NAME='vanguardbio_membership_staging';
 const MIGRATION_FLAG='approved-wp08-b-20261031';
-const createTable=`CREATE TABLE "saved_report" (
+export const createTable=`CREATE TABLE "saved_report" (
  "id" uuid PRIMARY KEY,
  "owner_id" text NOT NULL REFERENCES "user" ("id") ON DELETE CASCADE,
  "title" varchar(120) NOT NULL,
@@ -17,7 +17,7 @@ const createTable=`CREATE TABLE "saved_report" (
  CONSTRAINT "saved_report_body_nonblank" CHECK (length(btrim("body"))>0),
  CONSTRAINT "saved_report_body_bound" CHECK (length("body")<=40000)
 )`;
-const createIndex=`CREATE INDEX "saved_report_owner_created_idx" ON "saved_report" ("owner_id","created_at" DESC,"id" DESC)`;
+export const createIndex=`CREATE INDEX "saved_report_owner_created_idx" ON "saved_report" ("owner_id","created_at" DESC,"id" DESC)`;
 export function assertWp08MigrationTarget(env=process.env){
  if(env.RENDER_SERVICE_ID!==STAGING_SERVICE ||
     env.MEMBERSHIP_ENABLED!=='true' ||
