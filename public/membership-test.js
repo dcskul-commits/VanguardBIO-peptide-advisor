@@ -6,7 +6,7 @@ const resetPanel=$('reset-panel');
 const page=location.pathname;
 const post=async(path,body)=>{
  const response=await fetch('/api/auth/'+path,{method:'POST',credentials:'include',
- headers:{'Content-Type':'application/json'},body:JSON.stringify(body),redirect:'manual'});
+ headers:{'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store'});
  let data=null;try{data=await response.json()}catch{}
  return {ok:response.ok,status:response.status,data};
 };
@@ -27,7 +27,13 @@ if(page==='/membership/password-reset'){
      status(r.ok?'Password reset succeeded. You can now sign in with your new password.':'Reset failed or the link expired. Request a new reset email.',r.ok);
      if(r.ok){$('reset-form').hidden=true;$('login-link').hidden=false}
      else $('reset-submit').disabled=false;
-   }catch{status('Network error. Retry or request a fresh reset email.');$('reset-submit').disabled=false}
+   }catch(err){
+     // Browser transport failures are not proof that the reset did not take effect.
+     // Do not expose tokens or passwords in diagnostics.
+     status('Could not confirm the reset response. Check whether your new password works on the sign-in page; otherwise request a fresh reset email.');
+     $('login-link').hidden=false;
+     $('reset-submit').disabled=false;
+   }
  });
 }else{
  resetPanel.hidden=true;loginPanel.hidden=false;
