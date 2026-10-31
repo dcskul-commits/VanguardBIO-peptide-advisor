@@ -505,7 +505,7 @@ const server = http.createServer(async (req, res) => {
       res.end(data);return;
     } catch { return send(res,503,{error:'Staging membership page temporarily unavailable.'}); }
   }
-  if (pathname.startsWith('/api/auth/') || pathname === '/api/membership/me' || pathname === '/api/membership/workspace') {
+  if (pathname.startsWith('/api/auth/') || pathname === '/api/membership/me' || pathname === '/api/membership/workspace' || pathname === '/api/member/reports' || pathname.startsWith('/api/member/reports/')) {
     if (!membershipHandler) return send(res, 404, {error:'Not found.'});
     return membershipHandler.handle(req,res);
   }
@@ -1075,6 +1075,17 @@ return send(res, 200, { reply: safetyChecked.reply }, extra);
 server.requestTimeout = 40_000;
 server.headersTimeout = 15_000;
 async function wp06Start() {
+  if (process.env.WP08_APPLY_SCHEMA === 'approved-wp08-b-20261031') {
+    try {
+      const {initializeWp08SavedReportsSchema}=await import('./wp08-stage-schema.js');
+      const result=await initializeWp08SavedReportsSchema();
+      console.info('WP08_STAGING_SCHEMA',JSON.stringify(result));
+    } catch {
+      console.error('WP08_STAGING_SCHEMA',JSON.stringify({status:'failed_closed'}));
+      process.exitCode=1;
+      return;
+    }
+  }
   if (process.env.WP06_APPLY_SCHEMA === 'approved-20261031') {
     try {
       const {initializeApprovedStagingSchema}=await import('./wp06-stage-schema.js');
