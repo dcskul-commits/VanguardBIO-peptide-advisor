@@ -1071,6 +1071,13 @@ async function wp06Start() {
   server.listen(PORT, '0.0.0.0', () => console.log(`VanguardBio-You API listening on ${PORT}`));
 }
 void wp06Start();
+// One-time staging-only read-only verification status audit (no PII in logs).
+if (process.env.RENDER_SERVICE_ID === 'srv-dbib14gm7kps73cd1440') {
+  import('./wp06-account-verification-audit.js')
+    .then(({auditStagingEmailVerification})=>auditStagingEmailVerification())
+    .then(result=>console.info('WP06_ACCOUNT_VERIFICATION_AUDIT',JSON.stringify(result)))
+    .catch(()=>console.warn('WP06_ACCOUNT_VERIFICATION_AUDIT',JSON.stringify({status:'audit_failed'})));
+}
 // Staging only; read-only SELECT 1-equivalent and sanitized one-line status.
 if (process.env.RENDER_SERVICE_ID === 'srv-dbib14gm7kps73cd1440') {
   import('./staging-db-probe.js').then(({probeStagingDatabase})=>probeStagingDatabase())
