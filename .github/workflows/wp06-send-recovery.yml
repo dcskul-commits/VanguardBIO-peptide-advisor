@@ -1,0 +1,17 @@
+name: WP06 one-time staging password recovery request
+on:
+  push:
+    branches: [wp04-g3-output-safety-20261030]
+    paths: [wp06-request-user-reset-once.mjs]
+permissions:
+  contents: read
+jobs:
+  send-recovery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check wp06-request-user-reset-once.mjs
+      - run: node wp06-request-user-reset-once.mjs
