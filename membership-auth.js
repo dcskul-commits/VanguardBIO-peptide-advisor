@@ -5,6 +5,7 @@ import { toNodeHandler } from 'better-auth/node';
 import pg from 'pg';
 import { validateMembershipConfig, membershipAccess } from './membership-config.js';
 import { sendMembershipEmail } from './membership-email.js';
+import { memberWorkspaceDecision } from './membership-authorization.js';
 
 export function createMembershipHandler(env=process.env) {
   const cfg=validateMembershipConfig(env);
@@ -37,13 +38,20 @@ export function createMembershipHandler(env=process.env) {
       res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');
     }
     if(req.method==='OPTIONS'){res.writeHead(204);res.end();return;}
-    if(req.url?.split('?')[0] === '/api/membership/me') {
+    const memberRoute = req.url?.split('?')[0];
+    if(memberRoute === '/api/membership/me' || memberRoute === '/api/membership/workspace') {
       if(req.method!=='GET'){res.writeHead(405,{Allow:'GET, OPTIONS'});res.end();return;}
       // Better Auth validates the session on the server; never trust client-supplied user IDs.
       const session=await auth.api.getSession({headers:new Headers(
         Object.entries(req.headers).filter(([_,v])=>typeof v==='string').map(([k,v])=>[k,v])
       )});
       if(!session?.user){res.writeHead(401,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Authentication required'}));return;}
+      if(memberRoute === '/api/membership/workspace') {
+        const decision=memberWorkspaceDecision(session);
+        res.writeHead(decision.status,{'Content-Type':'application/json'});
+        res.end(JSON.stringify(decision.allowed?decision.body:{error:'Verified membership required'}));
+        return;
+      }
       const user=session.user;
       res.writeHead(200,{'Content-Type':'application/json'});
       res.end(JSON.stringify({user:{id:user.id,email:user.email,emailVerified:user.emailVerified}}));
