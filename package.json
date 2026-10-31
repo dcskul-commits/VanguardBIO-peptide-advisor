@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test content-quality.test.js report-completion.test.js output-safety.test.js research-recovery.test.js membership-config.test.js"
+    "test": "node --test content-quality.test.js report-completion.test.js output-safety.test.js research-recovery.test.js membership-config.test.js membership-email.test.js"
   },
   "dependencies": {
     "better-auth": "^1.4.0",
