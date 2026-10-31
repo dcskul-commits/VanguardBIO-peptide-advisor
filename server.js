@@ -505,7 +505,7 @@ const server = http.createServer(async (req, res) => {
       res.end(data);return;
     } catch { return send(res,503,{error:'Staging membership page temporarily unavailable.'}); }
   }
-  if (pathname.startsWith('/api/auth/') || pathname === '/api/membership/me') {
+  if (pathname.startsWith('/api/auth/') || pathname === '/api/membership/me' || pathname === '/api/membership/workspace') {
     if (!membershipHandler) return send(res, 404, {error:'Not found.'});
     return membershipHandler.handle(req,res);
   }
