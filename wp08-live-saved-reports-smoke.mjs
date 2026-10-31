@@ -1,4 +1,5 @@
 // WP08-B live staging-only negative access smoke. No credentials or user data.
+// Run once after staging saved-report feature activation.
 const base='https://vanguardbio-peptide-advisor-staging.onrender.com';
 const expected='vanguardbio-peptide-advisor-staging.onrender.com';
 if(new URL(base).hostname!==expected)throw Error('Staging-only service guard failed');
