@@ -1041,3 +1041,9 @@ return send(res, 200, { reply: safetyChecked.reply }, extra);
 server.requestTimeout = 40_000;
 server.headersTimeout = 15_000;
 server.listen(PORT, '0.0.0.0', () => console.log(`VanguardBio-You API listening on ${PORT}`));
+// Staging only; read-only SELECT 1-equivalent and sanitized one-line status.
+if (process.env.RENDER_SERVICE_ID === 'srv-dbib14gm7kps73cd1440') {
+  import('./staging-db-probe.js').then(({probeStagingDatabase})=>probeStagingDatabase())
+    .then(result=>console.info('WP06_STAGING_DATABASE',JSON.stringify(result)))
+    .catch(()=>console.warn('WP06_STAGING_DATABASE',JSON.stringify({status:'probe_failed'})));
+}
