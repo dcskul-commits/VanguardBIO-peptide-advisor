@@ -5,6 +5,8 @@
 const BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
 const PEPTIDES = [
   { name: 'BPC-157', pattern: /\bBPC[\s-]?157\b/i, terms: ['BPC-157', 'BPC 157'] },
+  { name: 'KPV', pattern: /\bKPV\b/i, terms: ['KPV', 'Lys-Pro-Val', 'Lysine-Proline-Valine'] },
+  { name: 'GHK-Cu', pattern: /\bGHK[\s-]?(?:Cu|copper)\b/i, terms: ['GHK-Cu', 'copper tripeptide-1'] },
   { name: 'TB-500', pattern: /\bTB[\s-]?500\b/i, terms: ['TB-500', 'TB 500'] },
   { name: 'sermorelin', pattern: /\bsermorelin\b/i, terms: ['sermorelin'] },
   { name: 'ipamorelin', pattern: /\bipamorelin\b/i, terms: ['ipamorelin'] },
