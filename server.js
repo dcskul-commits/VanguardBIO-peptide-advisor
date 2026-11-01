@@ -8,6 +8,8 @@ import {
   fetchPubMedByPMID
 } from './pubmed.js';
 import { retrieveResearchSources } from './research-sources.js';
+import { extractIntakePeptideTargets } from './wp09-intake-targets.js';
+import { buildEvidenceLedger, auditResearchReport } from './wp09-source-ledger.js';
 import { guardContentQuality, auditCitationMetadata, appendRetrievedPubMedReferences, removeModelPubMedBibliography, refineReviewedEvidenceClaims } from './content-quality.js';
 import { assessIntakeReport } from './report-completion.js';
 import { guardOutputSafety } from './output-safety.js';
@@ -578,6 +580,8 @@ const conversationText = messages
 
 const latestCompounds = detectCompounds(latestQuestion);
 const conversationCompounds = detectCompounds(conversationText);
+const explicitPeptideTargets = extractIntakePeptideTargets(messages);
+const allResearchTargets = [...new Set([...conversationCompounds,...explicitPeptideTargets])].slice(0,5);
 
 // The sixth answer completes the intake even when it does not explicitly
 // contain the words "generate report". The frontend sends the prior assistant
@@ -604,11 +608,11 @@ const isFinalResearchRequest =
 
 const shouldSearchPubMed =
   (researchIntent && latestCompounds.length > 0) ||
-  ((isFinalResearchRequest || justAnsweredQuestionSix) && conversationCompounds.length > 0);
+  ((isFinalResearchRequest || justAnsweredQuestionSix) && allResearchTargets.length > 0);
 
 const pubmedSearchQuestion =
-  (isFinalResearchRequest || justAnsweredQuestionSix) && conversationCompounds.length > 0
-    ? `${conversationCompounds.join(', ')} human clinical evidence safety muscle recovery`
+  (isFinalResearchRequest || justAnsweredQuestionSix) && allResearchTargets.length > 0
+    ? `${allResearchTargets.join(', ')} human clinical evidence safety recovery`
     : latestQuestion;
 
 const reportMode = justAnsweredQuestionSix || isFinalResearchRequest;
@@ -623,7 +627,7 @@ let retrievedStudies = [];
   if (shouldSearchPubMed) {
     try {
       
-const studies = await searchPubMed(pubmedSearchQuestion, MAX_PUBMED_RESULTS);
+const studies = await searchPubMed(pubmedSearchQuestion, MAX_PUBMED_RESULTS, {explicitTargets:explicitPeptideTargets});
 
 for (const pmid of requestedPmids) {
   if (studies.some(study => study.pmid === pmid)) {
@@ -1000,6 +1004,19 @@ const withPubMedReferences = appendRetrievedPubMedReferences(
 const finalWithSources = appendOfficialRegulatorySources(withPubMedReferences, isCompletedResearchReport);
 // Check only the same content that is returned to the user, after safeguards,
 // bibliography filtering and citation preservation, before discovery metadata.
+// WP09 evidence provenance audit is opt-in and staging-only. It does not
+// certify outcome-level claims or change the reply while under evaluation.
+if (process.env.RENDER_SERVICE_ID === 'srv-dbib14gm7kps73cd1440' &&
+    process.env.WP09_LEDGER_AUDIT === 'true' && isCompletedResearchReport) {
+  const ledger=buildEvidenceLedger(retrievedStudies,allResearchTargets);
+  const audit=auditResearchReport(finalWithSources,ledger);
+  console.info('WP09_PROVENANCE_AUDIT',JSON.stringify({
+    retrieved:ledger.length,targetMatches:audit.verifiedSourceCount,
+    citationMentions:audit.citedSourceCount,
+    codes:[...new Set(audit.findings.map(x=>x.code))],
+    claimSupportStatus:audit.claimSupportStatus
+  }));
+}
 const citationWarnings = isCompletedResearchReport
   ? auditCitationMetadata(finalWithSources, retrievedStudies) : [];
 if (citationWarnings.length)
