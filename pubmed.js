@@ -167,11 +167,7 @@ function boundedExplicitSearchEntries(targets=[]) {
     if(existing){entries.push(existing);continue;}
     // Escape punctuation before building a compound-specific matcher. An
     // explicit search term is only a discovery lead, never verified treatment.
-    const regex=new RegExp('\\\\b'+name.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\export async function searchPubMed(question, maxResults = 5) {
-  const compounds = detectCompounds(question);
-  if (!compounds.length) return [];
-  const count = Math.max(1, Math.min(Number(maxResults) || 5, 10));
-  const key = `${question.toLowerCase().trim()}|${count}`;').replace(/[- ]/g,'[\\\\s-]?')+'\\\\b','i');
+    const regex=new RegExp('\\\\b'+name.replace(/[- ]/g,'[\\\\s-]?')+'\\\\b','i');
     entries.push({name,pattern:regex,terms:[name]});
   }
   return entries;
