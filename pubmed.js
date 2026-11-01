@@ -184,7 +184,7 @@ export async function searchPubMed(question, maxResults = 5, {explicitTargets=[]
   const perCompound = new Map();
   const allIds = new Set();
   for (const compound of compounds) {
-    const entry = PEPTIDES.find(item => item.name === compound);
+    const entry = entries.find(item => item.name === compound);
     const base = `(${entry.terms.map(term => `"${term}"[All Fields]`).join(' OR ')})`;
     const ids = [];
     if (wantsHumanEvidence) ids.push(...await searchIds(`${base} AND (randomized controlled trial[pt] OR clinical trial[pt])`, 8));
