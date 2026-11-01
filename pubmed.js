@@ -167,7 +167,7 @@ function boundedExplicitSearchEntries(targets=[]) {
     if(existing){entries.push(existing);continue;}
     // Escape punctuation before building a compound-specific matcher. An
     // explicit search term is only a discovery lead, never verified treatment.
-    const regex=new RegExp('\\\\b'+name.replace(/[- ]/g,'[\\\\s-]?')+'\\\\b','i');
+    const regex=new RegExp(String.raw`\b`+name.replace(/[- ]/g,String.raw`[\s-]?`)+String.raw`\b`,'i');
     entries.push({name,pattern:regex,terms:[name]});
   }
   return entries;
