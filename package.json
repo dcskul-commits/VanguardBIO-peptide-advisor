@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test content-quality.test.js report-completion.test.js output-safety.test.js research-recovery.test.js membership-config.test.js membership-email.test.js membership-authorization.test.js wp08-saved-reports-proposal.test.js wp09-source-ledger.test.js"
+    "test": "node --test content-quality.test.js report-completion.test.js output-safety.test.js research-recovery.test.js membership-config.test.js membership-email.test.js membership-authorization.test.js wp08-saved-reports-proposal.test.js wp09-source-ledger.test.js wp09-intake-targets.test.js"
   },
   "dependencies": {
     "better-auth": "^1.4.0",
