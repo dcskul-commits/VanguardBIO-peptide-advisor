@@ -103,9 +103,9 @@ async function searchIds(term, retmax = 12) {
   return (data?.esearchresult?.idlist || []).filter(id => /^\d{6,9}$/.test(id));
 }
 
-function matchCompound(study, compound) {
+function matchCompound(study, compound, entries=PEPTIDES) {
   const text = `${study.title} ${study.abstract}`;
-  const item = PEPTIDES.find(p => p.name === compound);
+  const item = entries.find(p => p.name === compound);
   return !!item && item.pattern.test(text);
 }
 
@@ -120,7 +120,7 @@ function classifyStudy(study) {
   return 'study design not verified from publication type';
 }
 
-function scoreStudy(study, question, compound) {
+function scoreStudy(study, question, compound, entries=PEPTIDES) {
   const title = study.title.toLowerCase();
   const combined = `${title} ${study.abstract.toLowerCase()}`;
   const types = study.publicationTypes.join(' ').toLowerCase();
@@ -137,7 +137,7 @@ function scoreStudy(study, question, compound) {
       /\b(strength|physical function|functional performance|exercise capacity)\b/i.test(combined)) score += 6;
   if (/\b(safety|risk|adverse|heart failure)\b/i.test(question) &&
       /\b(safety|adverse events|heart failure|glucose|insulin)\b/i.test(combined)) score += 5;
-  if (matchCompound(study, compound)) score += 8;
+  if (matchCompound(study, compound, entries)) score += 8;
   return score;
 }
 
@@ -157,11 +157,31 @@ function enrich(study) {
   };
 }
 
-export async function searchPubMed(question, maxResults = 5) {
+function boundedExplicitSearchEntries(targets=[]) {
+  if(!Array.isArray(targets))return [];
+  const entries=[];
+  for(const raw of targets.slice(0,4)){
+    const name=String(raw||'').trim();
+    if(!/^[a-z][a-z0-9]*(?:[- ][a-z0-9]+){0,2}$/i.test(name)||name.length>34)continue;
+    const existing=PEPTIDES.find(p=>p.name.toLowerCase()===name.toLowerCase()||p.pattern.test(name));
+    if(existing){entries.push(existing);continue;}
+    // Escape punctuation before building a compound-specific matcher. An
+    // explicit search term is only a discovery lead, never verified treatment.
+    const regex=new RegExp('\\\\b'+name.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\export async function searchPubMed(question, maxResults = 5) {
   const compounds = detectCompounds(question);
   if (!compounds.length) return [];
   const count = Math.max(1, Math.min(Number(maxResults) || 5, 10));
-  const key = `${question.toLowerCase().trim()}|${count}`;
+  const key = `${question.toLowerCase().trim()}|${count}`;').replace(/[- ]/g,'[\\\\s-]?')+'\\\\b','i');
+    entries.push({name,pattern:regex,terms:[name]});
+  }
+  return entries;
+}
+export async function searchPubMed(question, maxResults = 5, {explicitTargets=[]}={}) {
+  const entries=[...PEPTIDES,...boundedExplicitSearchEntries(explicitTargets).filter(x=>!PEPTIDES.some(p=>p.name.toLowerCase()===x.name.toLowerCase()))];
+  const compounds=[...new Set([...detectCompounds(question),...boundedExplicitSearchEntries(explicitTargets).map(x=>x.name)])].slice(0,5);
+  if (!compounds.length) return [];
+  const count = Math.max(1, Math.min(Number(maxResults) || 5, 10));
+  const key = `${question.toLowerCase().trim()}|${compounds.join(',').toLowerCase()}|${count}`;
   const cached = cache.get(key);
   if (cached && Date.now() - cached.time < CACHE_TTL) return cached.results;
   const wantsHumanEvidence = /\b(human|humans|clinical|trial|trials|strength|function|efficacy|effectiveness|patients)\b/i.test(question);
@@ -185,8 +205,8 @@ export async function searchPubMed(question, maxResults = 5) {
     compound,
     (perCompound.get(compound) || [])
       .map(id => byId.get(id)).filter(Boolean)
-      .filter(study => matchCompound(study, compound))
-      .sort((a, b) => scoreStudy(b, question, compound) - scoreStudy(a, question, compound))
+      .filter(study => matchCompound(study, compound, entries))
+      .sort((a, b) => scoreStudy(b, question, compound, entries) - scoreStudy(a, question, compound, entries))
   ]));
   let progress = true;
   while (chosen.size < count && progress) {
@@ -197,7 +217,7 @@ export async function searchPubMed(question, maxResults = 5) {
       if (candidate) { chosen.set(candidate.pmid, candidate); progress = true; }
     }
   }
-  const results = [...chosen.values()];
+  const results = [...chosen.values()].map(study => ({...study, matchedCompounds:[...new Set([...study.matchedCompounds,...compounds.filter(c=>matchCompound(study,c,entries))])]}));
   if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value);
   cache.set(key, { time: Date.now(), results });
   return results;
