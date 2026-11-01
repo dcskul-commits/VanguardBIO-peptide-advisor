@@ -10,7 +10,7 @@ const BAD=new Set(['broad','plain','technical','human','clinical','recovery','he
  'unsure','study','studies','safety','evidence','literature','research','full','depth','none','general']);
 function normalized(s){return String(s||'').trim().replace(/\s+/g,' ');}
 function fromAnswer(answer){
- const text=normalized(answer);if(!text||text.length>140||REJECT.test(text))return [];
+ const text=normalized(answer);if(!text||text.length>140||REJECT.test(text)||/[()[\]{}"'=]/.test(text))return [];
  const result=KNOWN.filter(x=>x.regex.test(text)).map(x=>x.name);
  // Only accept previously unrecognized short *standalone* tokens as targets,
  // rather than guessing peptides from free-form health/intake narratives.
